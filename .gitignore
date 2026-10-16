@@ -1,0 +1,10 @@
+.gradle/
+local.properties
+build/
+**/build/
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+app/src/main/assets/distress_multilingual.tflite
