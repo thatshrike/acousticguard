@@ -17,7 +17,8 @@ class FalsePositiveLogger(context: Context) {
     }
 
     private fun append(type: String, labels: List<String>) {
-        val old = runCatching { JSONArray(prefs.getString(KEY_EVENTS, "[]")) }.getOrDefault(JSONArray())
+        val old = runCatching { JSONArray(prefs.getString(KEY_EVENTS, "[]") ?: "[]") }
+            .getOrDefault(JSONArray())
         old.put(
             JSONObject()
                 .put("type", type)
