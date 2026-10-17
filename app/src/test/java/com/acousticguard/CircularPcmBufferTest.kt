@@ -10,8 +10,10 @@ class CircularPcmBufferTest {
         val buffer = CircularPcmBuffer(4)
         buffer.writePcm16(shortArrayOf(1, 2, 3))
         assertArrayEquals(shortArrayOf(2, 3), buffer.snapshotPcm16())
-        buffer.writePcm16(shortArrayOf(4, 5))
-        assertArrayEquals(shortArrayOf(3, 4, 5), buffer.snapshotPcm16())
+        buffer.writePcm16(shortArrayOf(4))
+        assertArrayEquals(shortArrayOf(3, 4), buffer.snapshotPcm16())
+        buffer.writePcm16(shortArrayOf(5))
+        assertArrayEquals(shortArrayOf(4, 5), buffer.snapshotPcm16())
         assertEquals(4, buffer.sizeBytes())
     }
 }
