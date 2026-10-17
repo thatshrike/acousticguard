@@ -47,7 +47,6 @@ object CommunityMeshBroadcaster {
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_LOW)
             .setConnectable(false)
             .setTimeout(0)
-        if (extended) settingsBuilder.setLegacyMode(false)
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .addServiceUuid(ParcelUuid(SERVICE_UUID))
@@ -180,6 +179,7 @@ object CommunityMeshNotifier {
                 .setPriority(android.app.Notification.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .build()
+        )
         Log.i("AcousticGuardMesh", "Authenticated nearby event received")
     }
 }
