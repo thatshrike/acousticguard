@@ -106,9 +106,12 @@ class GracePeriodActivity : Activity() {
         setContentView(root)
     }
 
+    private var timer: CountDownTimer? = null
+
     private fun startCountdown() {
         vibrate()
-        object : CountDownTimer(COUNTDOWN_MS, 1_000L) {
+        timer?.cancel()
+        timer = object : CountDownTimer(COUNTDOWN_MS, 1_000L) {
             override fun onTick(millisUntilFinished: Long) {
                 countdown.text = ((millisUntilFinished + 999L) / 1_000L).toString()
                 vibrate()
@@ -123,6 +126,7 @@ class GracePeriodActivity : Activity() {
     private fun cancelAsFalsePositive(reason: String) {
         if (resolved) return
         resolved = true
+        timer?.cancel()
         AdaptiveThresholdStore(this).recordFalsePositive()
         FalsePositiveLogger(this).recordFalsePositive(labels.toList() + reason)
         notifyServiceResolved()
@@ -132,6 +136,7 @@ class GracePeriodActivity : Activity() {
     private fun triggerDuressDispatch() {
         if (resolved) return
         resolved = true
+        timer?.cancel()
         FalsePositiveLogger(this).recordDuressTrigger(labels.toList())
         // The screen presents the same successful-abort outcome, while the
         // service schedules the encrypted SOS without another visible prompt.
@@ -140,6 +145,11 @@ class GracePeriodActivity : Activity() {
             putExtra(AcousticCaptureService.EXTRA_DURESS_LABELS, labels)
         })
         finishAndRemoveTask()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        timer?.cancel()
     }
 
     private fun authenticateWithBiometrics() {

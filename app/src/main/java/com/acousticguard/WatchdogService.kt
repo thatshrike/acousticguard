@@ -144,6 +144,9 @@ class WatchdogService : Service() {
         }
 
         fun stop(context: android.content.Context) {
+            runCatching {
+                context.startService(Intent(context, WatchdogService::class.java).setAction(ACTION_STOP))
+            }
             context.stopService(Intent(context, WatchdogService::class.java))
         }
     }

@@ -133,6 +133,17 @@ class AcousticCaptureService : Service() {
                 getSystemService(NotificationManager::class.java).cancel(ALERT_NOTIFICATION_ID)
                 return START_STICKY
             }
+            ACTION_CANCEL_ALERT -> {
+                preAlertInFlight.set(false)
+                pipeline?.reset()
+                lastInferenceAt = 0L
+                lastRapidProbeAt = 0L
+                candidateActive = false
+                candidateGeneration++
+                getSystemService(NotificationManager::class.java).cancel(ALERT_NOTIFICATION_ID)
+                getSystemService(NotificationManager::class.java).cancel(101)
+                return START_STICKY
+            }
             ACTION_PRE_ALERT_RESOLVED -> {
                 preAlertInFlight.set(false)
                 pipeline?.reset()
@@ -140,6 +151,8 @@ class AcousticCaptureService : Service() {
                 lastRapidProbeAt = 0L
                 candidateActive = false
                 candidateGeneration++
+                getSystemService(NotificationManager::class.java).cancel(ALERT_NOTIFICATION_ID)
+                getSystemService(NotificationManager::class.java).cancel(101)
             }
         }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -618,6 +631,7 @@ class AcousticCaptureService : Service() {
         const val EXTRA_CALIBRATION_COUNT = "calibration_count"
         const val EXTRA_CALIBRATION_REMAINING = "calibration_remaining"
         const val ACTION_CANCEL_QUIET_ALERT = "com.acousticguard.action.CANCEL_QUIET_ALERT"
+        const val ACTION_CANCEL_ALERT = "com.acousticguard.action.CANCEL_ALERT"
         const val ACTION_PRE_ALERT_RESOLVED = "com.acousticguard.action.PRE_ALERT_RESOLVED"
         const val EXTRA_QUIET_EVENT_ID = "quiet_event_id"
         private const val MONITORING_CHANNEL_ID = "acoustic_monitoring"

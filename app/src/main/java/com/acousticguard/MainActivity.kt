@@ -91,8 +91,8 @@ class MainActivity : Activity() {
                 domStorageEnabled = true
                 allowFileAccess = true
                 cacheMode = WebSettings.LOAD_DEFAULT
-                useWideViewPort = false
-                loadWithOverviewMode = false
+                useWideViewPort = true
+                loadWithOverviewMode = true
             }
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -216,6 +216,11 @@ class MainActivity : Activity() {
     }
 
     private fun stopMonitoring() {
+        WatchdogService.stop(this)
+        val stopIntent = Intent(this, AcousticCaptureService::class.java).apply {
+            action = AcousticCaptureService.ACTION_STOP
+        }
+        startService(stopIntent)
         stopService(Intent(this, AcousticCaptureService::class.java))
         isMonitoringActive = false
         syncInitialStateToWeb()
@@ -256,6 +261,16 @@ class MainActivity : Activity() {
                 } else {
                     beginPermissionFlow()
                 }
+            }
+        }
+
+        @JavascriptInterface
+        fun cancelSosAlert() {
+            runOnUiThread {
+                val cancelIntent = Intent(this@MainActivity, AcousticCaptureService::class.java).apply {
+                    action = AcousticCaptureService.ACTION_CANCEL_ALERT
+                }
+                startService(cancelIntent)
             }
         }
 

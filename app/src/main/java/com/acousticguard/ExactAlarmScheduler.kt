@@ -28,7 +28,6 @@ object ExactAlarmScheduler {
 
     fun schedule(context: Context, eventId: String, labels: Array<String>, delayMs: Long = 1_000L): Boolean {
         require(delayMs >= 0L) { "delayMs must be non-negative" }
-        if (!canSchedule(context)) return false
         if (!DispatchEventStore(context).markScheduled(eventId)) return false
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val intent = Intent(context, SosDispatchReceiver::class.java).apply {
@@ -43,16 +42,31 @@ object ExactAlarmScheduler {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val canExact = canSchedule(context)
         return runCatching {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                SystemClock.elapsedRealtime() + delayMs,
-                pendingIntent
-            )
+            if (canExact) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    SystemClock.elapsedRealtime() + delayMs,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    SystemClock.elapsedRealtime() + delayMs,
+                    pendingIntent
+                )
+            }
             true
         }.getOrElse {
-            DispatchEventStore(context).markFailed(eventId)
-            false
+            // Direct failover dispatch if alarm scheduling throws SecurityException
+            runCatching {
+                context.sendBroadcast(intent)
+                true
+            }.getOrElse {
+                DispatchEventStore(context).markFailed(eventId)
+                false
+            }
         }
     }
 
@@ -63,10 +77,10 @@ object ExactAlarmScheduler {
             data = android.net.Uri.parse("acousticguard://sos/$eventId")
         }
         PendingIntent.getBroadcast(
-                context,
-                0,
-                intent,
-                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-            )?.let { context.getSystemService(AlarmManager::class.java).cancel(it) }
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )?.let { context.getSystemService(AlarmManager::class.java).cancel(it) }
     }
 }
