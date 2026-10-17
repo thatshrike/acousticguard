@@ -46,6 +46,13 @@ Git because a safety model must be trained, evaluated, signed, and
 provenance-reviewed. Put the approved binary at the asset path before building a
 release APK.
 
+Debug builds include `DevDspDistressModel`, a deterministic end-to-end fallback
+used only when the model asset is absent. It treats a Tier 1 candidate as a
+development distress event so the foreground service, grace period, exact alarm,
+encrypted payload, and optional mesh can be exercised immediately. Release
+builds do not enable this fallback and remain fail-closed until the approved
+model is present.
+
 ## Tier 1 physiological DSP
 
 `TierOneAnalyzer.kt` adds three pure-Kotlin detectors without persisting raw
@@ -180,6 +187,9 @@ application's `make test` check remains offline and dependency-free.
    supported language keyword. Confirm that one-off sounds never dispatch, that
    two qualifying windows show the visible cancel surface, and that quiet mode
    uses only the disclosed notification cancellation path.
+8. Use **TEST SOS PIPELINE (SIMULATE DISTRESS)** to exercise the alert path
+   without creating an acoustic event. Quiet mode uses its five-second
+   notification cancellation path; normal mode opens the ten-second activity.
 7. Test airplane mode, Doze, revoked exact-alarm access, denied notifications,
    microphone privacy toggle, Bluetooth route changes, call interruption, OEM
    battery controls, reboot, and force-stop. Record every degraded state.

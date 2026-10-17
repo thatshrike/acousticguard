@@ -2,7 +2,10 @@ package com.acousticguard
 
 import android.Manifest
 import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -24,7 +27,26 @@ class MainActivity : Activity() {
     private lateinit var endpointInput: EditText
     private lateinit var quietAlertSwitch: Switch
     private lateinit var communityMeshSwitch: Switch
+    private lateinit var operationStatus: TextView
     private var permissionIndex = 0
+    private var telemetryReceiverRegistered = false
+
+    private val telemetryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != AcousticCaptureService.ACTION_AUDIO_TELEMETRY) return
+            val db = intent.getIntExtra(AcousticCaptureService.EXTRA_RMS_DB, -100)
+            val candidate = intent.getBooleanExtra(AcousticCaptureService.EXTRA_CANDIDATE_FLAG, false)
+            val fastTrack = intent.getBooleanExtra(AcousticCaptureService.EXTRA_FAST_TRACK, false)
+            val filled = ((db + 60) * 10 / 60).coerceIn(0, 10)
+            val meter = "█".repeat(filled) + "░".repeat(10 - filled)
+            status.text = if (candidate) {
+                "Acoustic Anomaly Flagged!\nMic Level: $db dB [$meter]${if (fastTrack) "\nFast-track fusion active" else ""}"
+            } else {
+                "Mic Level: $db dB [$meter]"
+            }
+            status.setTextColor(if (candidate) 0xFFB3261E.toInt() else 0xFF333333.toInt())
+        }
+    }
 
     private val requiredPermissions: List<String>
         get() = buildList {
@@ -61,8 +83,13 @@ class MainActivity : Activity() {
             text = "AcousticGuard\nOn-device distress monitoring"
             textSize = 22f
         })
-        status = TextView(this).apply { text = "No microphone is active." }
+        status = TextView(this).apply {
+            text = "Mic Level: -- dB [░░░░░░░░░░]\nWaiting for monitoring telemetry..."
+            textSize = 16f
+        }
         add(status)
+        operationStatus = TextView(this).apply { text = "Monitoring inactive." }
+        add(operationStatus)
         pinInput = EditText(this).apply {
             hint = "Quick cancel PIN (4–8 digits)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
@@ -82,7 +109,7 @@ class MainActivity : Activity() {
         }
         add(endpointInput)
         quietAlertSwitch = Switch(this).apply {
-            text = "Quiet alert mode (no app screen; Android disclosure remains)"
+            text = "Quiet alert mode (suppresses screen; dispatches via silent notification)"
             isChecked = dispatch.quietAlertMode
         }
         add(quietAlertSwitch)
@@ -100,12 +127,28 @@ class MainActivity : Activity() {
                 dispatch.httpsEndpoint = endpointInput.text.toString()
                 dispatch.quietAlertMode = quietAlertSwitch.isChecked
                 dispatch.communityMeshEnabled = communityMeshSwitch.isChecked
-                status.text = "Settings saved locally. Raw audio is not stored."
+                operationStatus.text = "Settings saved locally. Raw audio is not stored."
             }
         })
         add(Button(this).apply {
             text = "Start on-device monitoring"
             setOnClickListener { beginPermissionFlow() }
+        })
+        add(Button(this).apply {
+            text = "TEST SOS PIPELINE (SIMULATE DISTRESS)"
+            setBackgroundColor(0xFFB3261E.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
+            setOnClickListener {
+                operationStatus.text = "Simulation requested; opening the pre-alert flow..."
+                val intent = Intent(this@MainActivity, AcousticCaptureService::class.java).apply {
+                    action = AcousticCaptureService.ACTION_SIMULATE_ALERT
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+            }
         })
         add(Button(this).apply {
             text = "Allow battery optimization exemption"
@@ -115,7 +158,7 @@ class MainActivity : Activity() {
             text = "Allow exact alarm dispatch"
             setOnClickListener {
                 if (ExactAlarmScheduler.canSchedule(this@MainActivity)) {
-                    status.text = "Exact alarms are enabled."
+                    operationStatus.text = "Exact alarms are enabled."
                 } else {
                     ExactAlarmScheduler.requestAccess(this@MainActivity)
                 }
@@ -142,6 +185,26 @@ class MainActivity : Activity() {
         setContentView(scroll)
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (telemetryReceiverRegistered) return
+        val filter = IntentFilter(AcousticCaptureService.ACTION_AUDIO_TELEMETRY)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(telemetryReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION") registerReceiver(telemetryReceiver, filter)
+        }
+        telemetryReceiverRegistered = true
+    }
+
+    override fun onStop() {
+        if (telemetryReceiverRegistered) {
+            unregisterReceiver(telemetryReceiver)
+            telemetryReceiverRegistered = false
+        }
+        super.onStop()
+    }
+
     private fun beginPermissionFlow() {
         permissionIndex = 0
         requestNextPermission()
@@ -166,26 +229,26 @@ class MainActivity : Activity() {
             permissionIndex++
             requestNextPermission()
         } else {
-            status.text = "Permission denied: ${permissions.firstOrNull() ?: "required permission"}. Monitoring remains off."
+            operationStatus.text = "Permission denied: ${permissions.firstOrNull() ?: "required permission"}. Monitoring remains off."
         }
     }
 
     private fun startMonitoring() {
         if (!Settings.canDrawOverlays(this)) {
-            status.text = "Monitoring can start, but enable countdown overlay for the most reliable pre-alert."
+            operationStatus.text = "Monitoring can start, but enable countdown overlay for the most reliable pre-alert."
         }
         if (!ExactAlarmScheduler.canSchedule(this)) {
-            status.append(" Enable exact alarm access for Doze-resistant dispatch.")
+            operationStatus.append(" Enable exact alarm access for Doze-resistant dispatch.")
         }
         val intent = Intent(this, AcousticCaptureService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
-        status.text = "Monitoring active. A visible foreground notification is required by Android."
+        operationStatus.text = "Monitoring active. A visible foreground notification is required by Android."
     }
 
     private fun requestBatteryOptimizationExemption() {
         val power = getSystemService(PowerManager::class.java)
         if (power.isIgnoringBatteryOptimizations(packageName)) {
-            status.text = "Battery optimization exemption is already enabled."
+            operationStatus.text = "Battery optimization exemption is already enabled."
             return
         }
         try {

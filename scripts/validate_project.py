@@ -27,6 +27,8 @@ def main() -> int:
     dsp = read("app/src/main/java/com/acousticguard/TierOneAnalyzer.kt")
     crypto = read("app/src/main/java/com/acousticguard/SosPayloadCrypto.kt")
     mesh = read("app/src/main/java/com/acousticguard/CommunityMesh.kt")
+    fallback = read("app/src/main/java/com/acousticguard/DevDspDistressModel.kt")
+    activity = read("app/src/main/java/com/acousticguard/MainActivity.kt")
     labels = [line for line in read("app/src/main/assets/distress_multilingual_labels.txt").splitlines() if line]
 
     for permission in (
@@ -60,6 +62,12 @@ def main() -> int:
     require(mesh, r"BluetoothLeAdvertiser", "BLE advertiser")
     require(mesh, r"BluetoothLeScanner", "BLE scanner")
     require(service, r"quietAlertMode", "quiet alert preference")
+    require(fallback, r"combinedConfidence = 0\.88f", "development DSP fallback")
+    require(service, r"BuildConfig\.DEBUG", "debug-only fallback guard")
+    require(service, r"ACTION_AUDIO_TELEMETRY", "audio telemetry broadcast")
+    require(service, r"ACTION_SIMULATE_ALERT", "simulation action")
+    require(activity, r"setContentView\(scroll\)", "attached main activity layout")
+    require(activity, r"TEST SOS PIPELINE \(SIMULATE DISTRESS\)", "simulation button")
     if len(labels) != 16 or not {
         "screaming_vocal_friction", "hyperventilation_gasp", "physical_struggle_thud",
         "physical_restraint_groan", "suffocation_stridor", "help", "madad", "मदद",

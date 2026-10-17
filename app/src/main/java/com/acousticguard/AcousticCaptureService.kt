@@ -17,6 +17,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import kotlin.math.log10
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -45,8 +46,14 @@ class AcousticCaptureService : Service() {
         try {
             pipeline = DistressDetectionPipeline(TfliteDistressModel(this))
         } catch (error: Exception) {
-            // Fail closed: Tier 1 can continue to provide an honest status, but cannot alert alone.
-            modelError = error.message ?: error.javaClass.simpleName
+            if (BuildConfig.DEBUG) {
+                // Development / DSP fallback: usable debug APK before the approved
+                // model asset is provisioned. Release builds remain fail-closed.
+                pipeline = DistressDetectionPipeline(DevDspDistressModel())
+                modelError = null
+            } else {
+                modelError = error.message ?: error.javaClass.simpleName
+            }
         }
     }
 
@@ -54,6 +61,12 @@ class AcousticCaptureService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_SIMULATE_ALERT -> {
+                startAsForeground()
+                preAlertInFlight.set(false)
+                launchPreAlert(listOf("screaming_vocal_friction", "help (simulated)"), forceVisible = true)
                 return START_NOT_STICKY
             }
             ACTION_CANCEL_QUIET_ALERT -> {
@@ -167,6 +180,7 @@ class AcousticCaptureService : Service() {
     private fun processFrame(frame: ShortArray) {
         audioBuffer.writePcm16(frame)
         val features = tierOneAnalyzer.analyze(frame, CAPTURE_RATE)
+        sendAudioTelemetry(features)
         val now = android.os.SystemClock.elapsedRealtime()
         val model = pipeline ?: return
 
@@ -187,7 +201,19 @@ class AcousticCaptureService : Service() {
         }
     }
 
-    private fun launchPreAlert(labels: List<String>) {
+    private fun sendAudioTelemetry(features: TierOneFeatures) {
+        val rmsDb = (20f * log10(features.audio.rms.coerceAtLeast(1.0e-5f)))
+            .toInt()
+            .coerceIn(-100, 0)
+        sendBroadcast(Intent(ACTION_AUDIO_TELEMETRY).apply {
+            setPackage(packageName)
+            putExtra(EXTRA_RMS_DB, rmsDb)
+            putExtra(EXTRA_CANDIDATE_FLAG, features.candidate)
+            putExtra(EXTRA_FAST_TRACK, features.fastTrack)
+        })
+    }
+
+    private fun launchPreAlert(labels: List<String>, forceVisible: Boolean = false) {
         if (DispatchPreferences(this).quietAlertMode) {
             launchQuietAlert(labels)
             return
@@ -199,7 +225,7 @@ class AcousticCaptureService : Service() {
         try {
             // Overlay access improves reliability for a user-visible countdown, but Android may
             // still deny background activity starts. The notification remains the fallback.
-            if (Settings.canDrawOverlays(this)) startActivity(intent)
+            if (forceVisible || Settings.canDrawOverlays(this)) startActivity(intent)
         } catch (_: SecurityException) {
             // Fall through to the notification action.
         }
@@ -351,6 +377,11 @@ class AcousticCaptureService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.acousticguard.action.STOP"
+        const val ACTION_AUDIO_TELEMETRY = "com.acousticguard.action.AUDIO_TELEMETRY"
+        const val EXTRA_RMS_DB = "rms_db"
+        const val EXTRA_CANDIDATE_FLAG = "candidate_flag"
+        const val EXTRA_FAST_TRACK = "fast_track"
+        const val ACTION_SIMULATE_ALERT = "com.acousticguard.action.SIMULATE_ALERT"
         const val ACTION_CANCEL_QUIET_ALERT = "com.acousticguard.action.CANCEL_QUIET_ALERT"
         const val ACTION_PRE_ALERT_RESOLVED = "com.acousticguard.action.PRE_ALERT_RESOLVED"
         const val EXTRA_QUIET_EVENT_ID = "quiet_event_id"
