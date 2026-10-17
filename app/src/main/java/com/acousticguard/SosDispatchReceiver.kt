@@ -5,13 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.LocationManager
 import android.telephony.SmsManager
 import android.util.Log
-import android.util.Base64
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.UUID
 import java.util.concurrent.Executors
 
@@ -27,17 +22,13 @@ class SosDispatchReceiver : BroadcastReceiver() {
         val pending = goAsync()
         val labels = intent.getStringArrayExtra(ExactAlarmScheduler.EXTRA_LABELS).orEmpty()
         EXECUTOR.execute {
-        try {
-            EmergencyDispatcher(context.applicationContext).dispatch(eventId, labels.toList())
-        } finally {
+            try {
+                EmergencyDispatcher(context.applicationContext).dispatch(eventId, labels.toList())
+            } finally {
                 runCatching {
                     val serviceIntent = Intent(context, AcousticCaptureService::class.java)
                         .setAction(AcousticCaptureService.ACTION_PRE_ALERT_RESOLVED)
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        context.startForegroundService(serviceIntent)
-                    } else {
-                        context.startService(serviceIntent)
-                    }
+                    context.startService(serviceIntent)
                 }.onFailure { Log.w("AcousticGuardDispatch", "Could not clear alert state", it) }
                 DispatchEventStore(context).markAttempted(eventId)
                 pending.finish()
@@ -55,14 +46,15 @@ private class EmergencyDispatcher(private val context: Context) {
         context.getSystemService(android.app.NotificationManager::class.java).cancel(101)
         val prefs = DispatchPreferences(context)
         val eventUuid = runCatching { UUID.fromString(eventId) }.getOrNull() ?: return
-        val location = lastKnownCoarseLocation()
+        val location = LocationBurstManager(context).lastKnown()
         val encryptedPayload = runCatching {
             SosPayloadCrypto(context).encrypt(
                 eventUuid,
                 System.currentTimeMillis(),
-                location?.first?.toFloat(),
-                location?.second?.toFloat(),
-                labels.toSignatureFlags()
+                location?.latitude?.toFloat(),
+                location?.longitude?.toFloat(),
+                labels.toSignatureFlags(),
+                location?.capturedAtEpochMs
             )
         }.getOrElse {
             Log.e(TAG, "No authenticated SOS payload was produced", it)
@@ -86,46 +78,29 @@ private class EmergencyDispatcher(private val context: Context) {
             }.onFailure { Log.e(TAG, "SMS dispatch failed", it) }
         }
         if (prefs.httpsEndpoint.startsWith("https://", ignoreCase = true)) {
-            val payload = JSONObject()
-                .put("protocol_version", 1)
-                .put("event_id", eventId)
-                .put("encrypted_payload_b64", Base64.encodeToString(encryptedPayload, Base64.NO_WRAP))
-                .toString()
-            runCatching { postHttps(prefs.httpsEndpoint, payload) }
-                .onFailure { Log.e(TAG, "HTTPS dispatch failed", it) }
-        }
-    }
-
-    private fun lastKnownCoarseLocation(): Pair<Double, Double>? {
-        if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return null
-        val manager = context.getSystemService(LocationManager::class.java)
-        val candidates = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
-        return candidates.asSequence().mapNotNull { provider ->
-            runCatching { manager.getLastKnownLocation(provider) }.getOrNull()
-        }.firstOrNull()?.let { it.latitude to it.longitude }
-    }
-
-    private fun postHttps(endpoint: String, payload: String) {
-        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            // Keep total receiver work bounded; durable retry belongs in a future
-            // server/WorkManager integration, not an unbounded BroadcastReceiver.
-            connectTimeout = 2_500
-            readTimeout = 5_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-        }
-        try {
-            connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
-            val responseCode = connection.responseCode
-            if (responseCode !in 200..299) error("HTTPS endpoint returned $responseCode")
-        } finally {
-            connection.disconnect()
+            val networkBoundary = SosNetworkFlushBoundary(context)
+            val enqueueResult = networkBoundary.enqueueEncryptedPayload(
+                eventId = eventId,
+                encryptedPayload = encryptedPayload,
+                expiresAtEpochMs = System.currentTimeMillis() + QUEUED_EVENT_TTL_MS
+            )
+            when (enqueueResult) {
+                EnqueueResult.ENQUEUED, EnqueueResult.DUPLICATE -> Unit
+                EnqueueResult.REJECTED_FULL ->
+                    Log.e(TAG, "Encrypted SOS queue is full; queued delivery was rejected")
+                EnqueueResult.REJECTED_INVALID, EnqueueResult.REJECTED_EXPIRED ->
+                    Log.e(TAG, "Encrypted SOS queue rejected event $eventId: $enqueueResult")
+            }
+            val flush = networkBoundary.onConnectivityAvailable()
+            if (flush.deferred > 0) {
+                Log.w(TAG, "HTTPS SOS deferred: ${flush.deferred} envelope(s) remain queued")
+            }
         }
     }
 
     companion object {
         private const val TAG = "AcousticGuardDispatch"
+        private const val QUEUED_EVENT_TTL_MS = StoreAndForwardQueue.DEFAULT_EVENT_TTL_MS
     }
 }
 

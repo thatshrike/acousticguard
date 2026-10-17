@@ -33,6 +33,16 @@ class MainActivity : Activity() {
 
     private val telemetryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == AcousticCaptureService.ACTION_CALIBRATION_STATUS) {
+                val count = intent.getIntExtra(AcousticCaptureService.EXTRA_CALIBRATION_COUNT, 0)
+                val remaining = intent.getIntExtra(AcousticCaptureService.EXTRA_CALIBRATION_REMAINING, 0)
+                operationStatus.text = if (remaining > 0) {
+                    "Safe profile sample recording in progress ($remaining frames remaining). Keep the environment safe."
+                } else {
+                    "Safe profile samples saved: $count/3. Raw audio was discarded."
+                }
+                return
+            }
             if (intent.action != AcousticCaptureService.ACTION_AUDIO_TELEMETRY) return
             val db = intent.getIntExtra(AcousticCaptureService.EXTRA_RMS_DB, -100)
             val candidate = intent.getBooleanExtra(AcousticCaptureService.EXTRA_CANDIDATE_FLAG, false)
@@ -53,6 +63,7 @@ class MainActivity : Activity() {
             add(Manifest.permission.RECORD_AUDIO)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
             add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
             if (DispatchPreferences(this@MainActivity).phoneNumber.isNotEmpty()) {
                 add(Manifest.permission.SEND_SMS)
             }
@@ -151,6 +162,17 @@ class MainActivity : Activity() {
             }
         })
         add(Button(this).apply {
+            text = "Record safe profile sample (${PersonalizationStore(this@MainActivity).sampleCount()}/3)"
+            setOnClickListener {
+                operationStatus.text = "Starting safe profile sample; do not use distress sounds."
+                val intent = Intent(this@MainActivity, AcousticCaptureService::class.java).apply {
+                    action = AcousticCaptureService.ACTION_RECORD_SAFE_SAMPLE
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
+                else startService(intent)
+            }
+        })
+        add(Button(this).apply {
             text = "Allow battery optimization exemption"
             setOnClickListener { requestBatteryOptimizationExemption() }
         })
@@ -162,6 +184,13 @@ class MainActivity : Activity() {
                 } else {
                     ExactAlarmScheduler.requestAccess(this@MainActivity)
                 }
+            }
+        })
+        add(Button(this).apply {
+            text = "Rotate SOS encryption key"
+            setOnClickListener {
+                val version = SosPayloadCrypto(this@MainActivity).rotateKey()
+                operationStatus.text = "SOS key rotated to version $version. Existing queued envelopes remain decryptable locally."
             }
         })
         add(Button(this).apply {
@@ -189,6 +218,7 @@ class MainActivity : Activity() {
         super.onStart()
         if (telemetryReceiverRegistered) return
         val filter = IntentFilter(AcousticCaptureService.ACTION_AUDIO_TELEMETRY)
+        filter.addAction(AcousticCaptureService.ACTION_CALIBRATION_STATUS)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(telemetryReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
@@ -240,9 +270,13 @@ class MainActivity : Activity() {
         if (!ExactAlarmScheduler.canSchedule(this)) {
             operationStatus.append(" Enable exact alarm access for Doze-resistant dispatch.")
         }
+        WatchdogService.start(this)
         val intent = Intent(this, AcousticCaptureService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
         operationStatus.text = "Monitoring active. A visible foreground notification is required by Android."
+        if (BuildConfig.NATIVE_AUDIO_ENABLED) {
+            operationStatus.append(" Native audio: ${NativeAudioBoundary.status().detail}.")
+        }
     }
 
     private fun requestBatteryOptimizationExemption() {

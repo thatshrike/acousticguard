@@ -29,6 +29,24 @@ def main() -> int:
     mesh = read("app/src/main/java/com/acousticguard/CommunityMesh.kt")
     fallback = read("app/src/main/java/com/acousticguard/DevDspDistressModel.kt")
     activity = read("app/src/main/java/com/acousticguard/MainActivity.kt")
+    app_gradle = read("app/build.gradle.kts")
+    proguard = read("app/proguard-rules.pro")
+    native_boundary = read("app/src/main/java/com/acousticguard/NativeAudioBoundary.kt")
+    native_cmake = read("app/src/main/cpp/CMakeLists.txt")
+    native_cpp = read("app/src/main/cpp/acousticguard_audio.cpp")
+    native_doc = read("NATIVE_AUDIO.md")
+    queue = read("app/src/main/java/com/acousticguard/StoreAndForwardQueue.kt")
+    flush_boundary = read("app/src/main/java/com/acousticguard/SosQueueFlushBoundary.kt")
+    network_boundary = read("app/src/main/java/com/acousticguard/SosNetworkFlushBoundary.kt")
+    receiver = read("app/src/main/java/com/acousticguard/SosDispatchReceiver.kt")
+    watchdog = read("app/src/main/java/com/acousticguard/WatchdogService.kt")
+    location = read("app/src/main/java/com/acousticguard/LocationBurstManager.kt")
+    noise = read("app/src/main/java/com/acousticguard/AdaptiveNoiseProfile.kt")
+    personalization = read("app/src/main/java/com/acousticguard/PersonalizationStore.kt")
+    motion = read("app/src/main/java/com/acousticguard/MotionFusion.kt")
+    pin = read("app/src/main/java/com/acousticguard/DispatchPreferences.kt")
+    crypto = read("app/src/main/java/com/acousticguard/SosPayloadCrypto.kt")
+    readme = read("README.md")
     labels = [line for line in read("app/src/main/assets/distress_multilingual_labels.txt").splitlines() if line]
 
     for permission in (
@@ -43,6 +61,8 @@ def main() -> int:
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_ADVERTISE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.ACCESS_FINE_LOCATION",
     ):
         require(manifest, re.escape(permission), permission)
     require(manifest, r'android:foregroundServiceType="microphone(?:\|connectedDevice)?"', "microphone FGS type")
@@ -68,6 +88,58 @@ def main() -> int:
     require(service, r"ACTION_SIMULATE_ALERT", "simulation action")
     require(activity, r"setContentView\(scroll\)", "attached main activity layout")
     require(activity, r"TEST SOS PIPELINE \(SIMULATE DISTRESS\)", "simulation button")
+    require(app_gradle, r"acousticguard\.nativeAudio", "native audio opt-in property")
+    require(app_gradle, r"externalNativeBuild", "gated native build configuration")
+    require(app_gradle, r'buildConfigField\("boolean", "NATIVE_AUDIO_ENABLED"', "native build flag")
+    require(native_boundary, r"object NativeAudioBoundary", "Kotlin native audio boundary")
+    require(native_boundary, r"System\.loadLibrary\(LIBRARY_NAME\)", "JNI library loading")
+    require(native_boundary, r"BuildConfig\.NATIVE_AUDIO_ENABLED", "native opt-in guard")
+    require(native_boundary, r"Backend\.AUDIO_RECORD", "AudioRecord fallback backend")
+    require(proguard, r"com\.acousticguard\.NativeAudioBoundary", "JNI boundary shrinker keep rule")
+    require(native_cmake, r"add_library\(acousticguard_audio SHARED", "native audio library")
+    require(native_cmake, r"target_link_libraries\(acousticguard_audio PRIVATE aaudio log\)", "platform AAudio link")
+    require(native_cpp, r"#include <aaudio/AAudio\.h>", "platform AAudio header")
+    require(native_cpp, r"AAudioStreamBuilder_setSampleRate", "16 kHz AAudio request")
+    require(native_cpp, r"AAUDIO_SHARING_MODE_EXCLUSIVE", "best-effort exclusive request")
+    require(native_cpp, r"AAUDIO_PERFORMANCE_MODE_LOW_LATENCY", "AAudio low-latency request")
+    require(native_cpp, r"Java_com_acousticguard_NativeAudioBoundary_nativeProbe", "JNI probe entry point")
+    require(native_cpp, r"Java_com_acousticguard_NativeAudioBoundary_nativeStart", "JNI native audio start entry point")
+    require(native_cpp, r"Java_com_acousticguard_NativeAudioBoundary_nativeStop", "JNI native audio stop entry point")
+    require(native_doc, r"disabled by default", "native default-off documentation")
+    require(native_doc, r"AudioRecord", "native AudioRecord fallback documentation")
+    require(queue, r"SharedPreferencesStoreAndForwardStorage", "durable outbox storage")
+    require(queue, r"DEFAULT_MAX_ENTRIES", "bounded outbox entry limit")
+    require(queue, r"expiresAtEpochMs", "outbox expiry metadata")
+    require(queue, r"attemptCount", "outbox attempt metadata")
+    require(queue, r"DUPLICATE", "outbox event-ID deduplication")
+    require(flush_boundary, r"onConnectivityAvailable", "connectivity flush boundary")
+    require(flush_boundary, r"markRetry", "retry state transition")
+    require(network_boundary, r"enqueueEncryptedPayload", "encrypted payload enqueue integration")
+    require(receiver, r"SosNetworkFlushBoundary", "receiver outbox integration")
+    require(watchdog, r"onServiceDisconnected", "remote service watchdog")
+    require(manifest, r'android:process=":remote"', "remote capture process")
+    require(location, r"BURST_DURATION_MS", "location burst")
+    require(location, r"CACHE_INTERVAL_MS", "location cache interval")
+    require(noise, r"class AdaptiveNoiseProfile", "dynamic noise floor")
+    require(personalization, r"MAX_SAMPLES = 3", "three-sample personalization")
+    require(motion, r"TYPE_ACCELEROMETER", "accelerometer fusion")
+    require(motion, r"TYPE_GYROSCOPE", "gyroscope fusion")
+    require(pin, r"PBKDF2WithHmacSHA256", "hashed PIN storage")
+    require(pin, r"matchesDuressPin", "duress PIN verification")
+    require(crypto, r"setIsStrongBoxBacked", "StrongBox best-effort key creation")
+    require(crypto, r"fun rotateKey", "key rotation")
+    require(
+        readme,
+        r"does not enable an audible or near-ultrasonic SOS transmission\s+channel by default",
+        "audible/near-ultrasonic default-off policy",
+    )
+    require(readme, r"visible\s+opt-in with informed consent", "audible/near-ultrasonic consent policy")
+    if re.search(
+        r"find_package\(\s*oboe|oboe::|implementation\([^)]*oboe",
+        app_gradle + native_cmake + native_cpp,
+        flags=re.IGNORECASE,
+    ):
+        raise AssertionError("native scaffold must not add an Oboe dependency")
     if len(labels) != 16 or not {
         "screaming_vocal_friction", "hyperventilation_gasp", "physical_struggle_thud",
         "physical_restraint_groan", "suffocation_stridor", "help", "madad", "मदद",
@@ -76,7 +148,7 @@ def main() -> int:
         raise AssertionError("multilingual distress label contract is incomplete")
 
     print("AcousticGuard offline validation: PASS")
-    print("Checked manifest permissions, microphone FGS, bounded PCM path, TFLite thresholds, exact alarm, grace period, and multilingual labels.")
+    print("Checked manifest permissions, microphone FGS, bounded PCM path, TFLite thresholds, exact alarm, grace period, multilingual labels, gated AAudio/JNI scaffold, encrypted outbox, connectivity boundary, and SOS channel disclosure.")
     return 0
 
 

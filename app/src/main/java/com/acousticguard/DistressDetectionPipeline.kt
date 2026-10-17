@@ -189,7 +189,8 @@ class DistressDetectionPipeline(
     private val model: DistressModel,
     private val confidenceThreshold: Float = 0.82f,
     private val requiredWindows: Int = 2,
-    private val evaluationWindowMs: Long = 1_500L
+    private val evaluationWindowMs: Long = 1_500L,
+    private val scoreAdjuster: (ModelScores, TierOneFeatures?) -> ModelScores = { scores, _ -> scores }
 ) : Closeable {
     private var lastEvaluationAt = 0L
     private var consecutiveQualifying = 0
@@ -201,7 +202,7 @@ class DistressDetectionPipeline(
         tierOneAnomalous: Boolean,
         nowElapsedMs: Long = SystemClock.elapsedRealtime()
     ): PipelineResult {
-        return evaluateInternal(pcm16, tierOneAnomalous, nowElapsedMs, fastTrack = false)
+        return evaluateInternal(pcm16, tierOneAnomalous, nowElapsedMs, fastTrack = false, tierOne = null)
     }
 
     @Synchronized
@@ -210,7 +211,7 @@ class DistressDetectionPipeline(
         tierOne: TierOneFeatures,
         nowElapsedMs: Long = SystemClock.elapsedRealtime()
     ): PipelineResult {
-        return evaluateInternal(pcm16, tierOne.candidate, nowElapsedMs, tierOne.fastTrack, tierOne.reasons)
+        return evaluateInternal(pcm16, tierOne.candidate, nowElapsedMs, tierOne.fastTrack, tierOne.reasons, tierOne)
     }
 
     private fun evaluateInternal(
@@ -218,7 +219,8 @@ class DistressDetectionPipeline(
         tierOneAnomalous: Boolean,
         nowElapsedMs: Long,
         fastTrack: Boolean,
-        reasons: Set<TierOneReason> = emptySet()
+        reasons: Set<TierOneReason> = emptySet(),
+        tierOne: TierOneFeatures? = null
     ): PipelineResult {
         if (!tierOneAnomalous) {
             consecutiveQualifying = 0
@@ -232,7 +234,7 @@ class DistressDetectionPipeline(
         lastEvaluationAt = nowElapsedMs
 
         return try {
-            val scores = model.infer(pcm16)
+            val scores = scoreAdjuster(model.infer(pcm16), tierOne)
             if (scores.combinedConfidence >= confidenceThreshold) {
                 consecutiveQualifying++
             } else {

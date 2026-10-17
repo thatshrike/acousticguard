@@ -1,7 +1,10 @@
 package com.acousticguard
 
 import android.app.Activity
+import android.hardware.biometrics.BiometricPrompt
+import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.CountDownTimer
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -38,14 +41,6 @@ class GracePeriodActivity : Activity() {
         intent?.getStringArrayExtra(EXTRA_MATCHED_LABELS)?.let {
             labels = it.filterNotNull().toTypedArray()
         }
-    }
-
-    override fun onUserInteraction() {
-        super.onUserInteraction()
-        // Any deliberate interaction is treated as confirmation that the event was
-        // not an unattended emergency. This also prevents a hidden countdown from
-        // dispatching after the user has taken control of the device.
-        if (::countdown.isInitialized && !resolved) cancelAsFalsePositive("user_interaction")
     }
 
     private fun configureWindow() {
@@ -86,9 +81,12 @@ class GracePeriodActivity : Activity() {
         val pin = Button(this).apply {
             text = "Cancel with PIN"
             setOnClickListener {
-                val configured = DispatchPreferences(this@GracePeriodActivity).quickPin
-                if (configured.isNotEmpty() && pinInput.text.toString() == configured) {
+                val preferences = DispatchPreferences(this@GracePeriodActivity)
+                val candidate = pinInput.text.toString()
+                if (preferences.matchesRealPin(candidate)) {
                     cancelAsFalsePositive("pin")
+                } else if (preferences.matchesDuressPin(candidate) || preferences.matchesConfiguredDuressPin(candidate)) {
+                    triggerDuressDispatch()
                 } else {
                     pinInput.error = "PIN did not match"
                 }
@@ -98,6 +96,12 @@ class GracePeriodActivity : Activity() {
         root.addView(countdown)
         root.addView(pinInput, LinearLayout.LayoutParams(-1, -2))
         root.addView(pin, LinearLayout.LayoutParams(-1, -2))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            root.addView(Button(this).apply {
+                text = "Cancel with biometrics"
+                setOnClickListener { authenticateWithBiometrics() }
+            }, LinearLayout.LayoutParams(-1, -2))
+        }
         root.addView(cancel, LinearLayout.LayoutParams(-1, -2))
         setContentView(root)
     }
@@ -123,6 +127,39 @@ class GracePeriodActivity : Activity() {
         FalsePositiveLogger(this).recordFalsePositive(labels.toList() + reason)
         notifyServiceResolved()
         finishAndRemoveTask()
+    }
+
+    private fun triggerDuressDispatch() {
+        if (resolved) return
+        resolved = true
+        FalsePositiveLogger(this).recordDuressTrigger(labels.toList())
+        // The screen presents the same successful-abort outcome, while the
+        // service schedules the encrypted SOS without another visible prompt.
+        startService(android.content.Intent(this, AcousticCaptureService::class.java).apply {
+            action = AcousticCaptureService.ACTION_DURESS_DISPATCH
+            putExtra(AcousticCaptureService.EXTRA_DURESS_LABELS, labels)
+        })
+        finishAndRemoveTask()
+    }
+
+    private fun authenticateWithBiometrics() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        val prompt = BiometricPrompt.Builder(this)
+            .setTitle("Cancel AcousticGuard alert")
+            .setSubtitle("Verify your identity to cancel this alert")
+            .setDescription("Biometric verification is local to this device")
+            .setNegativeButton("Keep alert active", mainExecutor) { _, _ -> }
+            .build()
+        val cancellation = CancellationSignal()
+        prompt.authenticate(
+            cancellation,
+            mainExecutor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
+                    cancelAsFalsePositive("biometric")
+                }
+            }
+        )
     }
 
     private fun dispatch() {

@@ -101,7 +101,7 @@ object CommunityMeshScanner {
     private var callback: ScanCallback? = null
 
     @Synchronized
-    fun start(context: Context, onValidPayload: (DecodedSosPayload) -> Unit): Boolean {
+    fun start(context: Context, onValidPayload: (ByteArray, DecodedSosPayload) -> Unit): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             (!hasPermission(context, Manifest.permission.BLUETOOTH_SCAN) ||
                 !hasPermission(context, Manifest.permission.BLUETOOTH_CONNECT))
@@ -117,7 +117,7 @@ object CommunityMeshScanner {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 val payload = result.scanRecord?.getServiceData(ParcelUuid(CommunityMeshBroadcaster.SERVICE_UUID)) ?: return
                 val decoded = runCatching { SosPayloadCrypto(context).decrypt(payload) }.getOrNull() ?: return
-                onValidPayload(decoded)
+                onValidPayload(payload, decoded)
             }
 
             override fun onScanFailed(errorCode: Int) {

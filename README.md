@@ -8,14 +8,16 @@ can guarantee uninterrupted microphone access or network delivery.
 ## Architecture
 
 ```text
-Visible MainActivity
-  └─ sequential runtime permissions: RECORD_AUDIO → POST_NOTIFICATIONS → coarse location
-      └─ user starts microphone foreground service (type=microphone; connectedDevice when mesh is enabled)
-          ├─ AudioRecord reader thread
-          │   ├─ device-rate PCM16 → 16 kHz mono resampler
-           │   ├─ 500 ms Tier 1 RMS + ZCR + high-frequency spectral gate
-           │   ├─ derived envelope history for respiratory periodicity
-           │   ├─ impact attack/duration/crest-factor detector
+Visible MainActivity / UI process
+  ├─ best-effort WatchdogService in the default process
+  │   └─ Messenger heartbeat + restart of the isolated :remote service
+  └─ sequential runtime permissions: RECORD_AUDIO → notifications → coarse/fine location
+      └─ AcousticCaptureService in :remote (microphone FGS; connectedDevice when mesh is enabled)
+           ├─ AudioRecord reader thread (optional AAudio capability boundary)
+            │   ├─ device-rate PCM16 → 16 kHz mono resampler
+            │   ├─ 500 ms Tier 1 RMS + ZCR + high-frequency spectral gate
+            │   ├─ derived envelope history for respiratory periodicity
+            │   ├─ impact attack/duration/crest-factor detector
           │   └─ bounded 3.5 s in-memory CircularPcmBuffer
           └─ serialized Tier 2 TFLite inference (only after Tier 1 anomaly)
               ├─ calibrated multilingual distress/event scores
@@ -25,6 +27,7 @@ Visible MainActivity
                       └─ optional quiet alert: no app screen, 5 s exact-alarm window, notification cancel
                       └─ setExactAndAllowWhileIdle()
                            └─ SosDispatchReceiver: AES-GCM envelope + optional BLE/HTTPS/SMS
+                               └─ bounded encrypted store-and-forward outbox
 ```
 
 ### Why the model is a contract, not a guessed YAMNet label map
@@ -72,6 +75,17 @@ spectral and respiratory evidence uses a 750 ms inference cadence so two windows
 can complete in approximately 1.5 seconds; ordinary candidates retain the
 1.5-second cadence.
 
+## Optional native low-latency boundary
+
+The repository also contains an opt-in, platform-only AAudio backend. It is
+disabled in the default Gradle build, does not add Oboe, and falls back to the
+existing `AudioRecord` service path whenever the native stream is unavailable.
+See
+[`NATIVE_AUDIO.md`](NATIVE_AUDIO.md) for the gated NDK/CMake build command,
+`NativeAudioBoundary` status/fallback API, and the device-specific limitations
+of AAudio. A successful probe is not a guarantee of exclusive AAudio access or
+uninterrupted low latency.
+
 ## Quiet alerts, encryption, and Android disclosure
 
 The UI exposes **Quiet alert mode**, which avoids launching the bright countdown
@@ -94,6 +108,75 @@ must provision a shared receiver-domain key through an authenticated enrollment
 protocol; this repository deliberately does not embed a production key in the
 APK. HTTPS receives the encrypted envelope, not raw labels or coordinates.
 
+## Reliability and defensive controls
+
+- `WatchdogService` remains in the default process while the microphone service
+  is declared in `:remote`. It binds with an IPC `Messenger`, sends heartbeats,
+  and attempts a restart after disconnection or heartbeat timeout. This is
+  best-effort only: Android can kill both processes, deny a background restart,
+  or stop the app after force-stop.
+- PINs are stored as salted PBKDF2-HMAC-SHA256 verifiers, never as plaintext.
+  The reverse of the configured PIN is the default duress PIN. Entering it in
+  the countdown produces the same apparent abort outcome but schedules an
+  immediate encrypted dispatch without a visible second confirmation. A
+  platform biometric cancellation button is available on API 28+.
+- `LocationBurstManager` starts a best-effort 30-second Google Fused Location
+  high-accuracy burst, with platform GPS/network updates as a fallback, when an
+  alert is raised. It persists only the latest fix metadata at most every five
+  minutes. The SOS envelope includes the capture timestamp, allowing the
+  receiver to calculate how old an indoor fallback position is.
+- `AdaptiveNoiseProfile` learns a slow RMS/high-frequency environment floor only
+  from non-candidate frames. Loud steady environments therefore move the floor
+  gradually instead of producing a candidate for every frame.
+- The UI can collect three consented safe profile samples. Only scalar RMS, ZCR,
+  peak, and spectral features are kept. After three samples, a bounded local
+  confidence bias reduces matches close to the user's safe profile; it never
+  edits TFLite weights and never stores calibration audio.
+- `MotionFusion` combines accelerometer and gyroscope spikes with impact evidence.
+  A strong concurrent IMU event adds a bounded confidence modifier; IMU data can
+  never create a candidate without acoustic evidence.
+- `SosPayloadCrypto` rotates versioned AES-GCM keys and attempts Android StrongBox
+  hardware isolation where available, falling back to the Android Keystore when
+  StrongBox is absent. Existing key versions remain available for local queued
+  envelopes until an explicit key-retention policy removes them.
+
+## Store-and-forward network delivery
+
+When an HTTPS endpoint is configured, `SosDispatchReceiver` puts the AES-GCM
+envelope into a bounded local outbox before attempting delivery. The outbox
+stores only the event ID, encrypted envelope bytes, creation/expiry timestamps,
+and delivery-attempt state; it never stores PCM, raw audio, or plaintext labels.
+It is limited to 64 events, 128 bytes per envelope, and 8 KiB of total envelope
+bytes. Duplicate event IDs are ignored, expired events are removed, and a full
+queue refuses a new entry instead of silently evicting an older unexpired SOS.
+Failed attempts return to a retryable state with bounded exponential backoff;
+an abandoned in-flight attempt is reclaimable after its lease.
+
+`StoreAndForwardQueueTest` is a pure JVM test suite covering the entry and byte
+bounds, event-ID deduplication, expiry, retry/attempt persistence, abandoned
+claims, and the connectivity flush result boundary.
+
+`SosQueueFlushBoundary.onConnectivityAvailable()` is the explicit transport
+boundary for a future WorkManager or foreground-service integration. The
+current receiver uses the same boundary for one bounded immediate attempt, and
+the stored envelope remains available for a later connectivity callback. The
+boundary does not create a scheduler or claim that Android will run it while the
+app is stopped. BLE mesh remains an immediate optional transport; queued HTTPS
+delivery does not add another radio protocol or transmit audio.
+
+### Audible and near-ultrasonic SOS channel
+
+AcousticGuard does not enable an audible or near-ultrasonic SOS transmission
+channel by default. An emitted tone could be heard or felt by nearby people,
+could disturb children, animals, or hearing-sensitive users, could be mistaken
+for an emergency signal, and would add a privacy-sensitive outbound channel
+without guaranteeing authentication, reception, or emergency-service delivery.
+The detector also must not turn a user's microphone permission into permission
+to broadcast. Any future tone channel therefore requires a separate, visible
+opt-in with informed consent, a documented frequency/power/duration policy,
+local compatibility and hearing-safety review, and an explicit cancellation
+path. This slice intentionally implements no ultrasonic audio transmission.
+
 ## Android compliance and limitations
 
 - The app declares `FOREGROUND_SERVICE_MICROPHONE` and starts the service only
@@ -101,8 +184,9 @@ APK. HTTPS receives the encrypted envelope, not raw labels or coordinates.
 - `POST_NOTIFICATIONS` is requested on Android 13+; a foreground service still
   needs a notification even if the user denies that permission, although Android
   may place it only in the task manager/system UI.
-- Coarse location is requested up front but only the last known coarse location
-  is included in a dispatch payload. No audio is included.
+- Coarse and fine location are requested explicitly for the optional burst. Only
+  the last cached coordinates, accuracy, and capture timestamp are included in a
+  dispatch payload. No audio is included.
 - Optional BLE mesh additionally requires Android 12+ `BLUETOOTH_SCAN`,
   `BLUETOOTH_CONNECT`, and `BLUETOOTH_ADVERTISE` permissions (or fine location
   for legacy scanning). Legacy advertisers reject envelopes that cannot fit
@@ -136,7 +220,8 @@ make test
 
 It verifies the manifest permissions, microphone FGS declaration, 3.5-second
 buffer, 500 ms gate path, 0.82/two-window validation policy, exact alarm API,
-ten-second grace period, and multilingual label contract.
+ten-second grace period, multilingual label contract, and the default-off
+audible/near-ultrasonic channel policy.
 
 ### Local Android build
 
@@ -155,8 +240,9 @@ to populate it; this project never installs dependencies globally.
 
 ### Reproducible Docker build
 
-The Dockerfile installs only the pinned JDK, Android command-line tools, SDK
-platform/build-tools, and Gradle into the image, then builds the debug APK:
+The Dockerfile installs the pinned JDK, Android command-line tools, SDK
+platform/build-tools, NDK `27.2.12479018`, CMake `3.22.1`, and Gradle into the
+image, then builds the debug APK:
 
 ```bash
 docker build -t acousticguard:dev .
@@ -181,16 +267,20 @@ application's `make test` check remains offline and dependency-free.
    flow, **Allow exact alarm dispatch**, and, if the device's power policy is
    aggressive, **Allow battery optimization exemption**.
 5. Tap **Start on-device monitoring**. Approve `RECORD_AUDIO`, notifications,
-   and coarse location in order. Keep the foreground notification visible.
+   coarse location, and fine location in order. Keep the foreground notification
+   visible.
 6. Test with staged, consented recordings: ordinary conversation, music,
    laughter, dropped objects, screams, hyperventilation, impacts, and each
    supported language keyword. Confirm that one-off sounds never dispatch, that
    two qualifying windows show the visible cancel surface, and that quiet mode
    uses only the disclosed notification cancellation path.
-8. Use **TEST SOS PIPELINE (SIMULATE DISTRESS)** to exercise the alert path
+7. Use **TEST SOS PIPELINE (SIMULATE DISTRESS)** to exercise the alert path
    without creating an acoustic event. Quiet mode uses its five-second
    notification cancellation path; normal mode opens the ten-second activity.
-7. Test airplane mode, Doze, revoked exact-alarm access, denied notifications,
+8. Use **Record safe profile sample** three times with consented safe audio if
+   personal calibration is desired. Wait for each sample to complete before
+   starting the next one.
+9. Test airplane mode, Doze, revoked exact-alarm access, denied notifications,
    microphone privacy toggle, Bluetooth route changes, call interruption, OEM
    battery controls, reboot, and force-stop. Record every degraded state.
 

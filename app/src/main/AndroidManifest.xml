@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
@@ -66,10 +67,17 @@
             android:description="@string/service_description"
             android:exported="false"
             android:foregroundServiceType="microphone|connectedDevice"
+            android:stopWithTask="false"
+            android:process=":remote" />
+
+        <service
+            android:name=".WatchdogService"
+            android:exported="false"
             android:stopWithTask="false" />
 
         <receiver
             android:name=".SosDispatchReceiver"
-            android:exported="false" />
+            android:exported="false"
+            android:process=":remote" />
     </application>
 </manifest>

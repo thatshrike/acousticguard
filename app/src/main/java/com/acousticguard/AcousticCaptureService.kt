@@ -16,6 +16,8 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.Message
+import android.os.Messenger
 import android.provider.Settings
 import kotlin.math.log10
 import java.util.UUID
@@ -31,10 +33,31 @@ class AcousticCaptureService : Service() {
     private lateinit var gate: TierOneGate
     private lateinit var tierOneAnalyzer: TierOneAnalyzer
     private lateinit var audioBuffer: CircularPcmBuffer
+    private lateinit var locationBurst: LocationBurstManager
+    private lateinit var personalization: PersonalizationStore
+    private lateinit var motionFusion: MotionFusion
+    private lateinit var connectivityMonitor: SosConnectivityMonitor
     private var pipeline: DistressDetectionPipeline? = null
     private var captureThread: Thread? = null
     private var lastInferenceAt = 0L
     private var modelError: String? = null
+    private var nativeCaptureActive = false
+    private val nativeFrame = ShortArray(FRAME_SAMPLES)
+    private var nativeFrameFill = 0
+    @Volatile private var calibrationFramesRemaining = 0
+    private var calibrationRms = 0f
+    private var calibrationZcr = 0f
+    private var calibrationHighFrequency = 0f
+    private var calibrationPeak = 0f
+    private val ipcMessenger = Messenger(object : Handler(Looper.getMainLooper()) {
+        override fun handleMessage(message: Message) {
+            if (message.what == WatchdogService.MESSAGE_PING) {
+                runCatching { message.replyTo?.send(Message.obtain(null, WatchdogService.MESSAGE_PONG)) }
+            } else {
+                super.handleMessage(message)
+            }
+        }
+    })
 
     override fun onCreate() {
         super.onCreate()
@@ -43,13 +66,19 @@ class AcousticCaptureService : Service() {
         gate = TierOneGate(thresholdStore)
         tierOneAnalyzer = TierOneAnalyzer(gate)
         audioBuffer = CircularPcmBuffer(BUFFER_BYTES)
+        locationBurst = LocationBurstManager(this)
+        personalization = PersonalizationStore(this)
+        motionFusion = MotionFusion(this)
+        connectivityMonitor = SosConnectivityMonitor(this) {
+            inferenceExecutor.execute { SosNetworkFlushBoundary(this).onConnectivityAvailable() }
+        }
         try {
-            pipeline = DistressDetectionPipeline(TfliteDistressModel(this))
+            pipeline = createPipeline(TfliteDistressModel(this))
         } catch (error: Exception) {
             if (BuildConfig.DEBUG) {
                 // Development / DSP fallback: usable debug APK before the approved
                 // model asset is provisioned. Release builds remain fail-closed.
-                pipeline = DistressDetectionPipeline(DevDspDistressModel())
+                pipeline = createPipeline(DevDspDistressModel())
                 modelError = null
             } else {
                 modelError = error.message ?: error.javaClass.simpleName
@@ -60,6 +89,7 @@ class AcousticCaptureService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                WatchdogService.stop(this)
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -68,6 +98,22 @@ class AcousticCaptureService : Service() {
                 preAlertInFlight.set(false)
                 launchPreAlert(listOf("screaming_vocal_friction", "help (simulated)"), forceVisible = true)
                 return START_NOT_STICKY
+            }
+            ACTION_DURESS_DISPATCH -> {
+                startAsForeground()
+                locationBurst.startBurst()
+                dispatchDuressImmediately(intent.getStringArrayExtra(EXTRA_DURESS_LABELS).orEmpty().toList())
+                return START_NOT_STICKY
+            }
+            ACTION_RECORD_SAFE_SAMPLE -> {
+                startAsForeground()
+                calibrationFramesRemaining = CALIBRATION_FRAME_COUNT
+                calibrationRms = 0f
+                calibrationZcr = 0f
+                calibrationHighFrequency = 0f
+                calibrationPeak = 0f
+                sendCalibrationTelemetry()
+                return START_STICKY
             }
             ACTION_CANCEL_QUIET_ALERT -> {
                 intent.getStringExtra(EXTRA_QUIET_EVENT_ID)?.let { eventId ->
@@ -93,10 +139,18 @@ class AcousticCaptureService : Service() {
         }
         startAsForeground()
         if (DispatchPreferences(this).communityMeshEnabled) {
-            CommunityMeshScanner.start(this) { payload ->
+            CommunityMeshScanner.start(this) { envelope, payload ->
+                val expires = payload.timestampEpochMs + StoreAndForwardQueue.DEFAULT_EVENT_TTL_MS
+                SosNetworkFlushBoundary(this).enqueueEncryptedPayload(
+                    payload.eventId.toString(),
+                    envelope,
+                    expires
+                )
                 mainHandler.post { CommunityMeshNotifier.show(this, payload) }
             }
         }
+        connectivityMonitor.start()
+        motionFusion.start()
         if (running.compareAndSet(false, true)) startCapture()
         return START_STICKY
     }
@@ -125,8 +179,49 @@ class AcousticCaptureService : Service() {
             checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
 
     private fun startCapture() {
+        if (BuildConfig.NATIVE_AUDIO_ENABLED && NativeAudioBoundary.start(nativeSink)) {
+            nativeCaptureActive = true
+            return
+        }
         captureThread = Thread({ captureLoop() }, "acousticguard-audio").also { it.start() }
     }
+
+    private val nativeSink = object : NativeAudioBoundary.Sink {
+        override fun onPcm16(samples: ShortArray) {
+            if (!running.get()) return
+            synchronized(nativeFrame) {
+                var offset = 0
+                while (offset < samples.size) {
+                    val amount = minOf(FRAME_SAMPLES - nativeFrameFill, samples.size - offset)
+                    samples.copyInto(nativeFrame, nativeFrameFill, offset, offset + amount)
+                    nativeFrameFill += amount
+                    offset += amount
+                    if (nativeFrameFill == FRAME_SAMPLES) {
+                        processFrame(nativeFrame.copyOf())
+                        nativeFrameFill = 0
+                    }
+                }
+            }
+        }
+    }
+
+    private fun createPipeline(model: DistressModel): DistressDetectionPipeline =
+        DistressDetectionPipeline(model) { scores, features ->
+            if (features == null) {
+                scores
+            } else {
+                val motionBoost = if (features.sensorFusionBoost >= 0.5f) {
+                    val boost = features.sensorFusionBoost * SENSOR_CONFIDENCE_BOOST
+                    scores.copy(
+                        distressConfidence = (scores.distressConfidence + boost).coerceAtMost(1f),
+                        combinedConfidence = (scores.combinedConfidence + boost).coerceAtMost(1f)
+                    )
+                } else {
+                    scores
+                }
+                personalization.adjust(motionBoost, features)
+            }
+        }
 
     private fun captureLoop() {
         val recording = createAudioRecord() ?: run {
@@ -179,7 +274,8 @@ class AcousticCaptureService : Service() {
 
     private fun processFrame(frame: ShortArray) {
         audioBuffer.writePcm16(frame)
-        val features = tierOneAnalyzer.analyze(frame, CAPTURE_RATE)
+        val features = motionFusion.enrich(tierOneAnalyzer.analyze(frame, CAPTURE_RATE))
+        collectCalibrationSample(features)
         sendAudioTelemetry(features)
         val now = android.os.SystemClock.elapsedRealtime()
         val model = pipeline ?: return
@@ -210,10 +306,44 @@ class AcousticCaptureService : Service() {
             putExtra(EXTRA_RMS_DB, rmsDb)
             putExtra(EXTRA_CANDIDATE_FLAG, features.candidate)
             putExtra(EXTRA_FAST_TRACK, features.fastTrack)
+            putExtra(EXTRA_CALIBRATION_REMAINING, calibrationFramesRemaining)
+        })
+    }
+
+    private fun collectCalibrationSample(features: TierOneFeatures) {
+        if (calibrationFramesRemaining <= 0) return
+        calibrationRms += features.audio.rms
+        calibrationZcr += features.audio.zcr
+        calibrationHighFrequency += features.spectral.highFrequencyRatio ?: 0f
+        calibrationPeak += features.audio.peak
+        calibrationFramesRemaining--
+        if (calibrationFramesRemaining == 0) {
+            val count = CALIBRATION_FRAME_COUNT.toFloat()
+            val sample = features.copy(
+                audio = features.audio.copy(
+                    rms = calibrationRms / count,
+                    zcr = calibrationZcr / count,
+                    peak = calibrationPeak / count
+                ),
+                spectral = features.spectral.copy(
+                    highFrequencyRatio = calibrationHighFrequency / count
+                )
+            )
+            val total = personalization.recordSafeSample(sample)
+            sendCalibrationTelemetry(total)
+        }
+    }
+
+    private fun sendCalibrationTelemetry(sampleCount: Int = personalization.sampleCount()) {
+        sendBroadcast(Intent(ACTION_CALIBRATION_STATUS).apply {
+            setPackage(packageName)
+            putExtra(EXTRA_CALIBRATION_COUNT, sampleCount)
+            putExtra(EXTRA_CALIBRATION_REMAINING, calibrationFramesRemaining)
         })
     }
 
     private fun launchPreAlert(labels: List<String>, forceVisible: Boolean = false) {
+        locationBurst.startBurst()
         if (DispatchPreferences(this).quietAlertMode) {
             launchQuietAlert(labels)
             return
@@ -258,6 +388,17 @@ class AcousticCaptureService : Service() {
         )
     }
 
+    private fun dispatchDuressImmediately(labels: List<String>) {
+        val eventId = UUID.randomUUID().toString()
+        if (ExactAlarmScheduler.schedule(this, eventId, labels.toTypedArray(), delayMs = 0L)) {
+            FalsePositiveLogger(this).recordDispatchScheduled(eventId, labels + "duress")
+        } else {
+            FalsePositiveLogger(this).recordDispatchUnavailable(eventId, "duress_exact_alarm_unavailable")
+            reportCaptureFailure("Duress dispatch requires exact-alarm access and was not scheduled")
+        }
+        preAlertInFlight.set(false)
+    }
+
     private fun createAudioRecord(): AudioRecord? {
         for (rate in SUPPORTED_CAPTURE_RATES) {
             val minBytes = AudioRecord.getMinBufferSize(
@@ -297,6 +438,13 @@ class AcousticCaptureService : Service() {
         mainHandler.removeCallbacksAndMessages(null)
         captureThread?.interrupt()
         inferenceExecutor.shutdownNow()
+        motionFusion.stop()
+        connectivityMonitor.stop()
+        if (nativeCaptureActive) {
+            NativeAudioBoundary.stop()
+            nativeCaptureActive = false
+        }
+        locationBurst.stopBurst()
         CommunityMeshScanner.stop()
         CommunityMeshBroadcaster.stop()
         if (::tierOneAnalyzer.isInitialized) tierOneAnalyzer.reset()
@@ -305,7 +453,7 @@ class AcousticCaptureService : Service() {
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(intent: Intent?): IBinder = ipcMessenger.binder
 
     private fun monitoringNotification(message: String = "Listening on-device; no audio is uploaded") =
         Notification.Builder(this, MONITORING_CHANNEL_ID)
@@ -382,6 +530,12 @@ class AcousticCaptureService : Service() {
         const val EXTRA_CANDIDATE_FLAG = "candidate_flag"
         const val EXTRA_FAST_TRACK = "fast_track"
         const val ACTION_SIMULATE_ALERT = "com.acousticguard.action.SIMULATE_ALERT"
+        const val ACTION_DURESS_DISPATCH = "com.acousticguard.action.DURESS_DISPATCH"
+        const val EXTRA_DURESS_LABELS = "duress_labels"
+        const val ACTION_RECORD_SAFE_SAMPLE = "com.acousticguard.action.RECORD_SAFE_SAMPLE"
+        const val ACTION_CALIBRATION_STATUS = "com.acousticguard.action.CALIBRATION_STATUS"
+        const val EXTRA_CALIBRATION_COUNT = "calibration_count"
+        const val EXTRA_CALIBRATION_REMAINING = "calibration_remaining"
         const val ACTION_CANCEL_QUIET_ALERT = "com.acousticguard.action.CANCEL_QUIET_ALERT"
         const val ACTION_PRE_ALERT_RESOLVED = "com.acousticguard.action.PRE_ALERT_RESOLVED"
         const val EXTRA_QUIET_EVENT_ID = "quiet_event_id"
@@ -394,6 +548,8 @@ class AcousticCaptureService : Service() {
         private const val FRAME_SAMPLES = CAPTURE_RATE / 2
         private const val EVALUATION_WINDOW_MS = 1_500L
         private const val RESTART_DELAY_MS = 2_000L
+        private const val CALIBRATION_FRAME_COUNT = 6
+        private const val SENSOR_CONFIDENCE_BOOST = 0.15f
         private val SUPPORTED_CAPTURE_RATES = intArrayOf(16_000, 48_000, 44_100)
     }
 }

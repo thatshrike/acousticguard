@@ -43,7 +43,9 @@ data class TierOneFeatures(
     val respiratory: RespiratoryFeatures,
     val impact: ImpactFeatures,
     val candidate: Boolean,
-    val reasons: Set<TierOneReason>
+    val reasons: Set<TierOneReason>,
+    val motionShockScore: Float = 0f,
+    val sensorFusionBoost: Float = 0f
 ) {
     val fastTrack: Boolean
         get() = spectral.valid && respiratory.valid &&
@@ -55,7 +57,8 @@ class TierOneAnalyzer(
     private val gate: TierOneGate,
     private val spectral: SpectralAnalyzer = SpectralAnalyzer(),
     private val respiratory: RespiratoryPeriodicityDetector = RespiratoryPeriodicityDetector(),
-    private val impact: ImpactTransientDetector = ImpactTransientDetector()
+    private val impact: ImpactTransientDetector = ImpactTransientDetector(),
+    private val noiseProfile: AdaptiveNoiseProfile = AdaptiveNoiseProfile()
 ) {
     fun analyze(frame: ShortArray, sampleRate: Int = 16_000): TierOneFeatures {
         require(sampleRate > 0) { "sampleRate must be positive" }
@@ -63,10 +66,18 @@ class TierOneAnalyzer(
         val spectralFeatures = spectral.analyze(frame, sampleRate)
         val respiratoryFeatures = respiratory.update(frame, sampleRate)
         val impactFeatures = impact.analyze(frame, sampleRate, audio.baselineRms)
+        val ambient = noiseProfile.snapshot()
+        val highFrequencyCandidate = spectralFeatures.valid &&
+            (spectralFeatures.highFrequencyRatio ?: 0f) >= ambient.highFrequencyCandidateFloor &&
+            audio.rms >= ambient.rmsCandidateFloor
+        val candidate = audio.anomalous || highFrequencyCandidate ||
+            (respiratoryFeatures.valid && (respiratoryFeatures.periodicity ?: 0f) >= 0.55f) ||
+            impactFeatures.detected
+        noiseProfile.observe(audio.rms, spectralFeatures.highFrequencyRatio, candidate)
 
         val reasons = buildSet {
             if (audio.anomalous) add(TierOneReason.RMS_ZCR)
-            if (spectralFeatures.valid && (spectralFeatures.highFrequencyRatio ?: 0f) >= 0.35f && audio.rms >= 0.02f) {
+            if (highFrequencyCandidate) {
                 add(TierOneReason.HIGH_FREQUENCY)
             }
             if (respiratoryFeatures.valid && (respiratoryFeatures.periodicity ?: 0f) >= 0.55f) {
@@ -74,12 +85,13 @@ class TierOneAnalyzer(
             }
             if (impactFeatures.detected) add(TierOneReason.IMPACT_TRANSIENT)
         }
-        return TierOneFeatures(audio, spectralFeatures, respiratoryFeatures, impactFeatures, reasons.isNotEmpty(), reasons)
+        return TierOneFeatures(audio, spectralFeatures, respiratoryFeatures, impactFeatures, candidate, reasons)
     }
 
     fun reset() {
         respiratory.reset()
         impact.reset()
+        noiseProfile.reset()
     }
 }
 
