@@ -26,15 +26,18 @@ class GracePeriodActivity : Activity() {
         configureWindow()
         eventId = savedInstanceState?.getString(KEY_EVENT_ID)
             ?: UUID.randomUUID().toString()
-        labels = savedInstanceState?.getStringArray(KEY_LABELS)
-            ?: intent.getStringArrayExtra(EXTRA_MATCHED_LABELS).orEmpty()
+        val rawLabels = savedInstanceState?.getStringArray(KEY_LABELS)
+            ?: intent.getStringArrayExtra(EXTRA_MATCHED_LABELS)
+        labels = rawLabels?.filterNotNull()?.toTypedArray() ?: emptyArray()
         render()
         startCountdown()
     }
 
     override fun onNewIntent(intent: android.content.Intent?) {
         super.onNewIntent(intent)
-        intent?.getStringArrayExtra(EXTRA_MATCHED_LABELS)?.let { labels = it }
+        intent?.getStringArrayExtra(EXTRA_MATCHED_LABELS)?.let {
+            labels = it.filterNotNull().toTypedArray()
+        }
     }
 
     override fun onUserInteraction() {
