@@ -26,6 +26,7 @@ object CommunityMeshBroadcaster {
     private val handler = Handler(Looper.getMainLooper())
     private var advertiser: BluetoothLeAdvertiser? = null
     private var callback: AdvertiseCallback? = null
+    private var stopRunnable: Runnable? = null
 
     @Synchronized
     fun start(context: Context, encryptedPayload: ByteArray, durationMs: Long = 30_000L): Boolean {
@@ -65,13 +66,17 @@ object CommunityMeshBroadcaster {
             leAdvertiser.startAdvertising(settingsBuilder.build(), data, newCallback)
             advertiser = leAdvertiser
             callback = newCallback
-            handler.postDelayed({ stop() }, durationMs.coerceIn(1_000L, 120_000L))
+            val scheduledStop = Runnable { stop() }
+            stopRunnable = scheduledStop
+            handler.postDelayed(scheduledStop, durationMs.coerceIn(1_000L, 120_000L))
             true
         }.getOrDefault(false)
     }
 
     @Synchronized
     fun stop() {
+        stopRunnable?.let(handler::removeCallbacks)
+        stopRunnable = null
         val currentAdvertiser = advertiser
         val currentCallback = callback
         if (currentAdvertiser != null && currentCallback != null) {
