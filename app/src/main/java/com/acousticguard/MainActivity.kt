@@ -1,6 +1,7 @@
 package com.acousticguard
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -13,48 +14,40 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.Switch
-import android.widget.TextView
+import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import org.json.JSONObject
 
 class MainActivity : Activity() {
-    private lateinit var status: TextView
-    private lateinit var pinInput: EditText
-    private lateinit var phoneInput: EditText
-    private lateinit var endpointInput: EditText
-    private lateinit var quietAlertSwitch: Switch
-    private lateinit var communityMeshSwitch: Switch
-    private lateinit var operationStatus: TextView
+    private lateinit var webView: WebView
+    private lateinit var dispatch: DispatchPreferences
     private var permissionIndex = 0
     private var telemetryReceiverRegistered = false
+    private var isMonitoringActive = false
 
     private val telemetryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == AcousticCaptureService.ACTION_CALIBRATION_STATUS) {
-                val count = intent.getIntExtra(AcousticCaptureService.EXTRA_CALIBRATION_COUNT, 0)
-                val remaining = intent.getIntExtra(AcousticCaptureService.EXTRA_CALIBRATION_REMAINING, 0)
-                operationStatus.text = if (remaining > 0) {
-                    "Safe profile sample recording in progress ($remaining frames remaining). Keep the environment safe."
-                } else {
-                    "Safe profile samples saved: $count/3. Raw audio was discarded."
+            when (intent.action) {
+                AcousticCaptureService.ACTION_CALIBRATION_STATUS -> {
+                    val count = intent.getIntExtra(AcousticCaptureService.EXTRA_CALIBRATION_COUNT, 0)
+                    val remaining = intent.getIntExtra(AcousticCaptureService.EXTRA_CALIBRATION_REMAINING, 0)
+                    webView.post {
+                        webView.evaluateJavascript("window.updateCalibration($count, $remaining);", null)
+                    }
                 }
-                return
+                AcousticCaptureService.ACTION_AUDIO_TELEMETRY -> {
+                    val db = intent.getIntExtra(AcousticCaptureService.EXTRA_RMS_DB, -100)
+                    val candidate = intent.getBooleanExtra(AcousticCaptureService.EXTRA_CANDIDATE_FLAG, false)
+                    val fastTrack = intent.getBooleanExtra(AcousticCaptureService.EXTRA_FAST_TRACK, false)
+                    webView.post {
+                        webView.evaluateJavascript("window.updateTelemetry($db, $candidate, $fastTrack);", null)
+                    }
+                }
             }
-            if (intent.action != AcousticCaptureService.ACTION_AUDIO_TELEMETRY) return
-            val db = intent.getIntExtra(AcousticCaptureService.EXTRA_RMS_DB, -100)
-            val candidate = intent.getBooleanExtra(AcousticCaptureService.EXTRA_CANDIDATE_FLAG, false)
-            val fastTrack = intent.getBooleanExtra(AcousticCaptureService.EXTRA_FAST_TRACK, false)
-            val filled = ((db + 60) * 10 / 60).coerceIn(0, 10)
-            val meter = "█".repeat(filled) + "░".repeat(10 - filled)
-            status.text = if (candidate) {
-                "Acoustic Anomaly Flagged!\nMic Level: $db dB [$meter]${if (fastTrack) "\nFast-track fusion active" else ""}"
-            } else {
-                "Mic Level: $db dB [$meter]"
-            }
-            status.setTextColor(if (candidate) 0xFFB3261E.toInt() else 0xFF333333.toInt())
         }
     }
 
@@ -64,10 +57,10 @@ class MainActivity : Activity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
             add(Manifest.permission.ACCESS_COARSE_LOCATION)
             add(Manifest.permission.ACCESS_FINE_LOCATION)
-            if (DispatchPreferences(this@MainActivity).phoneNumber.isNotEmpty()) {
+            if (dispatch.phoneNumber.isNotEmpty()) {
                 add(Manifest.permission.SEND_SMS)
             }
-            if (communityMeshSwitch.isChecked) {
+            if (dispatch.communityMeshEnabled) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     add(Manifest.permission.BLUETOOTH_SCAN)
                     add(Manifest.permission.BLUETOOTH_CONNECT)
@@ -78,134 +71,38 @@ class MainActivity : Activity() {
             }
         }
 
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val dispatch = DispatchPreferences(this)
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(32, 48, 32, 32)
-        }
-        fun add(view: android.view.View) = root.addView(
-            view,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        )
+        dispatch = DispatchPreferences(this)
 
-        add(TextView(this).apply {
-            text = "AcousticGuard\nOn-device distress monitoring"
-            textSize = 22f
-        })
-        status = TextView(this).apply {
-            text = "Mic Level: -- dB [░░░░░░░░░░]\nWaiting for monitoring telemetry..."
-            textSize = 16f
+        webView = WebView(this).apply {
+            setBackgroundColor(0xFF0C0E13.toInt())
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                allowFileAccess = true
+                cacheMode = WebSettings.LOAD_DEFAULT
+                useWideViewPort = true
+                loadWithOverviewMode = true
+            }
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    syncInitialStateToWeb()
+                }
+            }
+            webChromeClient = WebChromeClient()
+            addJavascriptInterface(AcousticGuardBridge(), "AndroidBridge")
+            loadUrl("file:///android_asset/web/index.html")
         }
-        add(status)
-        operationStatus = TextView(this).apply { text = "Monitoring inactive." }
-        add(operationStatus)
-        pinInput = EditText(this).apply {
-            hint = "Quick cancel PIN (4–8 digits)"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
-            setText(dispatch.quickPin)
-        }
-        add(pinInput)
-        phoneInput = EditText(this).apply {
-            hint = "Optional emergency SMS number"
-            inputType = android.text.InputType.TYPE_CLASS_PHONE
-            setText(dispatch.phoneNumber)
-        }
-        add(phoneInput)
-        endpointInput = EditText(this).apply {
-            hint = "Optional HTTPS dispatch endpoint"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
-            setText(dispatch.httpsEndpoint)
-        }
-        add(endpointInput)
-        quietAlertSwitch = Switch(this).apply {
-            text = "Quiet alert mode (suppresses screen; dispatches via silent notification)"
-            isChecked = dispatch.quietAlertMode
-        }
-        add(quietAlertSwitch)
-        communityMeshSwitch = Switch(this).apply {
-            text = "Enable encrypted nearby community mesh (optional)"
-            isChecked = dispatch.communityMeshEnabled
-        }
-        add(communityMeshSwitch)
 
-        add(Button(this).apply {
-            text = "Save emergency settings"
-            setOnClickListener {
-                dispatch.quickPin = pinInput.text.toString()
-                dispatch.phoneNumber = phoneInput.text.toString()
-                dispatch.httpsEndpoint = endpointInput.text.toString()
-                dispatch.quietAlertMode = quietAlertSwitch.isChecked
-                dispatch.communityMeshEnabled = communityMeshSwitch.isChecked
-                operationStatus.text = "Settings saved locally. Raw audio is not stored."
-            }
-        })
-        add(Button(this).apply {
-            text = "Start on-device monitoring"
-            setOnClickListener { beginPermissionFlow() }
-        })
-        add(Button(this).apply {
-            text = "TEST SOS PIPELINE (SIMULATE DISTRESS)"
-            setBackgroundColor(0xFFB3261E.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
-            setOnClickListener {
-                operationStatus.text = "Simulation requested; opening the pre-alert flow..."
-                val intent = Intent(this@MainActivity, AcousticCaptureService::class.java).apply {
-                    action = AcousticCaptureService.ACTION_SIMULATE_ALERT
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(intent)
-                } else {
-                    startService(intent)
-                }
-            }
-        })
-        add(Button(this).apply {
-            text = "Record safe profile sample (${PersonalizationStore(this@MainActivity).sampleCount()}/3)"
-            setOnClickListener {
-                operationStatus.text = "Starting safe profile sample; do not use distress sounds."
-                val intent = Intent(this@MainActivity, AcousticCaptureService::class.java).apply {
-                    action = AcousticCaptureService.ACTION_RECORD_SAFE_SAMPLE
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
-                else startService(intent)
-            }
-        })
-        add(Button(this).apply {
-            text = "Allow battery optimization exemption"
-            setOnClickListener { requestBatteryOptimizationExemption() }
-        })
-        add(Button(this).apply {
-            text = "Allow exact alarm dispatch"
-            setOnClickListener {
-                if (ExactAlarmScheduler.canSchedule(this@MainActivity)) {
-                    operationStatus.text = "Exact alarms are enabled."
-                } else {
-                    ExactAlarmScheduler.requestAccess(this@MainActivity)
-                }
-            }
-        })
-        add(Button(this).apply {
-            text = "Rotate SOS encryption key"
-            setOnClickListener {
-                val version = SosPayloadCrypto(this@MainActivity).rotateKey()
-                operationStatus.text = "SOS key rotated to version $version. Existing queued envelopes remain decryptable locally."
-            }
-        })
-        add(Button(this).apply {
-            text = "Allow countdown overlay"
-            setOnClickListener {
-                if (!Settings.canDrawOverlays(this@MainActivity)) {
-                    startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-                }
-            }
-        })
-
-        val scroll = ScrollView(this).apply {
+        // Attached main activity layout with scroll frame container
+        val scroll = FrameLayout(this).apply {
+            setBackgroundColor(0xFF0C0E13.toInt())
             addView(
-                root,
-                ViewGroup.LayoutParams(
+                webView,
+                FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
@@ -217,8 +114,9 @@ class MainActivity : Activity() {
     override fun onStart() {
         super.onStart()
         if (telemetryReceiverRegistered) return
-        val filter = IntentFilter(AcousticCaptureService.ACTION_AUDIO_TELEMETRY)
-        filter.addAction(AcousticCaptureService.ACTION_CALIBRATION_STATUS)
+        val filter = IntentFilter(AcousticCaptureService.ACTION_AUDIO_TELEMETRY).apply {
+            addAction(AcousticCaptureService.ACTION_CALIBRATION_STATUS)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(telemetryReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
@@ -227,12 +125,45 @@ class MainActivity : Activity() {
         telemetryReceiverRegistered = true
     }
 
+    override fun onResume() {
+        super.onResume()
+        syncInitialStateToWeb()
+    }
+
     override fun onStop() {
         if (telemetryReceiverRegistered) {
             unregisterReceiver(telemetryReceiver)
             telemetryReceiverRegistered = false
         }
         super.onStop()
+    }
+
+    private fun syncInitialStateToWeb() {
+        val stateJson = getSerializedState()
+        webView.post {
+            webView.evaluateJavascript("if(window.initFromNative) window.initFromNative($stateJson);", null)
+        }
+    }
+
+    private fun getSerializedState(): String {
+        val state = JSONObject().apply {
+            put("isMonitoring", isMonitoringActive)
+            put("quietAlertMode", dispatch.quietAlertMode)
+            put("communityMeshEnabled", dispatch.communityMeshEnabled)
+            put("quickPin", dispatch.quickPin)
+            put("phoneNumber", dispatch.phoneNumber)
+            put("httpsEndpoint", dispatch.httpsEndpoint)
+            put("safeSamplesCount", PersonalizationStore(this@MainActivity).sampleCount())
+            put("hasOverlay", Settings.canDrawOverlays(this@MainActivity))
+            put("hasExactAlarm", ExactAlarmScheduler.canSchedule(this@MainActivity))
+            put("isIgnoringBattery", getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName))
+            put("keyVersion", SosPayloadCrypto(this@MainActivity).currentKeyVersion())
+            put(
+                "nativeAudioStatus",
+                if (BuildConfig.NATIVE_AUDIO_ENABLED) NativeAudioBoundary.status().detail else "AudioRecord 16kHz"
+            )
+        }
+        return state.toString()
     }
 
     private fun beginPermissionFlow() {
@@ -259,32 +190,44 @@ class MainActivity : Activity() {
             permissionIndex++
             requestNextPermission()
         } else {
-            operationStatus.text = "Permission denied: ${permissions.firstOrNull() ?: "required permission"}. Monitoring remains off."
+            isMonitoringActive = false
+            syncInitialStateToWeb()
         }
     }
 
     private fun startMonitoring() {
-        if (!Settings.canDrawOverlays(this)) {
-            operationStatus.text = "Monitoring can start, but enable countdown overlay for the most reliable pre-alert."
-        }
-        if (!ExactAlarmScheduler.canSchedule(this)) {
-            operationStatus.append(" Enable exact alarm access for Doze-resistant dispatch.")
-        }
         WatchdogService.start(this)
         val intent = Intent(this, AcousticCaptureService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
-        operationStatus.text = "Monitoring active. A visible foreground notification is required by Android."
-        if (BuildConfig.NATIVE_AUDIO_ENABLED) {
-            operationStatus.append(" Native audio: ${NativeAudioBoundary.status().detail}.")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        isMonitoringActive = true
+        syncInitialStateToWeb()
+    }
+
+    private fun stopMonitoring() {
+        stopService(Intent(this, AcousticCaptureService::class.java))
+        isMonitoringActive = false
+        syncInitialStateToWeb()
+    }
+
+    // TEST SOS PIPELINE (SIMULATE DISTRESS)
+    private fun triggerSimulateAlert() {
+        val intent = Intent(this, AcousticCaptureService::class.java).apply {
+            action = AcousticCaptureService.ACTION_SIMULATE_ALERT
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
         }
     }
 
     private fun requestBatteryOptimizationExemption() {
         val power = getSystemService(PowerManager::class.java)
-        if (power.isIgnoringBatteryOptimizations(packageName)) {
-            operationStatus.text = "Battery optimization exemption is already enabled."
-            return
-        }
+        if (power.isIgnoringBatteryOptimizations(packageName)) return
         try {
             startActivity(
                 Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
@@ -293,6 +236,116 @@ class MainActivity : Activity() {
             )
         } catch (_: SecurityException) {
             startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        }
+    }
+
+    inner class AcousticGuardBridge {
+        @JavascriptInterface
+        fun toggleMonitoring() {
+            runOnUiThread {
+                if (isMonitoringActive) {
+                    stopMonitoring()
+                } else {
+                    beginPermissionFlow()
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun simulateDistress() {
+            runOnUiThread {
+                // TEST SOS PIPELINE (SIMULATE DISTRESS)
+                triggerSimulateAlert()
+            }
+        }
+
+        @JavascriptInterface
+        fun setQuietAlertMode(enabled: Boolean) {
+            runOnUiThread {
+                dispatch.quietAlertMode = enabled
+            }
+        }
+
+        @JavascriptInterface
+        fun setCommunityMeshEnabled(enabled: Boolean) {
+            runOnUiThread {
+                dispatch.communityMeshEnabled = enabled
+                if (enabled) {
+                    beginPermissionFlow()
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun saveQuickPin(pin: String) {
+            runOnUiThread {
+                dispatch.quickPin = pin
+            }
+        }
+
+        @JavascriptInterface
+        fun saveCircleSettings(phone: String, endpoint: String) {
+            runOnUiThread {
+                dispatch.phoneNumber = phone
+                dispatch.httpsEndpoint = endpoint
+                if (phone.isNotEmpty()) {
+                    beginPermissionFlow()
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun recordSafeSample() {
+            runOnUiThread {
+                val intent = Intent(this@MainActivity, AcousticCaptureService::class.java).apply {
+                    action = AcousticCaptureService.ACTION_RECORD_SAFE_SAMPLE
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun requestOverlay() {
+            runOnUiThread {
+                if (!Settings.canDrawOverlays(this@MainActivity)) {
+                    startActivity(
+                        Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        )
+                    )
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun requestExactAlarm() {
+            runOnUiThread {
+                if (!ExactAlarmScheduler.canSchedule(this@MainActivity)) {
+                    ExactAlarmScheduler.requestAccess(this@MainActivity)
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun requestBatteryExemption() {
+            runOnUiThread {
+                requestBatteryOptimizationExemption()
+            }
+        }
+
+        @JavascriptInterface
+        fun rotateKey(): Int {
+            return SosPayloadCrypto(this@MainActivity).rotateKey()
+        }
+
+        @JavascriptInterface
+        fun getInitialState(): String {
+            return getSerializedState()
         }
     }
 
