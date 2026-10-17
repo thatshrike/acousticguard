@@ -373,7 +373,7 @@ class ImpactTransientDetector(
         while (firstAbove > 0 && rmsWindows[firstAbove - 1] >= durationThreshold) firstAbove--
         var lastAbove = peakWindow
         while (lastAbove + 1 < rmsWindows.size && rmsWindows[lastAbove + 1] >= durationThreshold) lastAbove++
-        val durationMs = ((lastAbove - firstAbove + 1) * hopSamples * 1_000f / sampleRate)
+        val durationMs = ((lastAbove - firstAbove) * hopSamples + windowSamples) * 1_000f / sampleRate
         val clipped = clippedCount.toFloat() / sampleCount >= 0.01f
         val detected = cooldownRemainingMs <= 0f && !clipped &&
             peakRms >= max(0.06f, baselineRms * 4f) && peakToBaseline >= 4f &&
