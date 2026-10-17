@@ -35,8 +35,12 @@ def main() -> int:
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
         "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_ADVERTISE",
     ):
         require(manifest, re.escape(permission), permission)
     require(manifest, r'android:foregroundServiceType="microphone(?:\|connectedDevice)?"', "microphone FGS type")
@@ -55,6 +59,7 @@ def main() -> int:
     require(crypto, r"AES/GCM/NoPadding", "authenticated SOS encryption")
     require(mesh, r"BluetoothLeAdvertiser", "BLE advertiser")
     require(mesh, r"BluetoothLeScanner", "BLE scanner")
+    require(service, r"quietAlertMode", "quiet alert preference")
     if len(labels) != 16 or not {
         "screaming_vocal_friction", "hyperventilation_gasp", "physical_struggle_thud",
         "physical_restraint_groan", "suffocation_stridor", "help", "madad", "मदद",
