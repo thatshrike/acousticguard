@@ -92,7 +92,7 @@ class AcousticCaptureService : Service() {
         val notification = monitoringNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val serviceTypes = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
-                if (DispatchPreferences(this).communityMeshEnabled) {
+                if (DispatchPreferences(this).communityMeshEnabled && meshForegroundTypeAllowed()) {
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
                 } else {
                     0
@@ -106,6 +106,10 @@ class AcousticCaptureService : Service() {
             startForeground(MONITORING_NOTIFICATION_ID, notification)
         }
     }
+
+    private fun meshForegroundTypeAllowed(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
 
     private fun startCapture() {
         captureThread = Thread({ captureLoop() }, "acousticguard-audio").also { it.start() }

@@ -64,11 +64,13 @@ class SosPayloadCrypto(context: Context, private val keyAlias: String = DEFAULT_
             updateAAD(AUTHENTICATED_DATA)
         }
         val encrypted = cipher.doFinal(plain)
-        return ByteBuffer.allocate(1 + NONCE_BYTES + encrypted.size)
+        val envelope = ByteBuffer.allocate(1 + NONCE_BYTES + encrypted.size)
             .put(VERSION)
             .put(nonce)
             .put(encrypted)
             .array()
+        check(envelope.size <= MAX_ENVELOPE_BYTES) { "SOS envelope exceeds BLE transport budget" }
+        return envelope
     }
 
     fun decrypt(envelope: ByteArray): DecodedSosPayload? {
@@ -84,14 +86,16 @@ class SosPayloadCrypto(context: Context, private val keyAlias: String = DEFAULT_
             if (plain.size != PLAINTEXT_BYTES || plain[0] != VERSION) return null
             val decoded = ByteBuffer.wrap(plain).order(ByteOrder.BIG_ENDIAN).apply { position(1) }
             val counter = decoded.long
-            val lastAccepted = preferences.getLong(KEY_LAST_ACCEPTED_COUNTER, 0L)
-            if (counter <= lastAccepted) return null
             val eventId = UUID(decoded.long, decoded.long)
+            val replayKey = "$counter:$eventId"
+            val acceptedEvents = preferences.getStringSet(KEY_ACCEPTED_EVENTS, emptySet()).orEmpty().toMutableSet()
+            if (!acceptedEvents.add(replayKey)) return null
             val timestamp = decoded.long
             val latitude = decoded.float
             val longitude = decoded.float
             val flags = decoded.short.toInt() and 0xFFFF
-            preferences.edit().putLong(KEY_LAST_ACCEPTED_COUNTER, counter).apply()
+            while (acceptedEvents.size > MAX_ACCEPTED_EVENTS) acceptedEvents.remove(acceptedEvents.first())
+            preferences.edit().putStringSet(KEY_ACCEPTED_EVENTS, acceptedEvents).apply()
             DecodedSosPayload(eventId, counter, timestamp, latitude, longitude, flags)
         }.getOrNull()
     }
@@ -124,11 +128,13 @@ class SosPayloadCrypto(context: Context, private val keyAlias: String = DEFAULT_
         private const val DEFAULT_KEY_ALIAS = "acousticguard_sos_domain_v1"
         private const val PREFERENCES = "acousticguard_crypto"
         private const val KEY_COUNTER = "outgoing_counter"
-        private const val KEY_LAST_ACCEPTED_COUNTER = "last_accepted_counter"
+        private const val KEY_ACCEPTED_EVENTS = "accepted_events"
+        private const val MAX_ACCEPTED_EVENTS = 256
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val TAG_BITS = 128
         private const val NONCE_BYTES = 12
         private const val TAG_BYTES = 16
+        private const val MAX_ENVELOPE_BYTES = 128
         private const val PLAINTEXT_BYTES = 1 + 8 + 16 + 8 + 4 + 4 + 2
         private val VERSION = 1.toByte()
         private val AUTHENTICATED_DATA = "AcousticGuard-SOS-v1".toByteArray(Charsets.US_ASCII)

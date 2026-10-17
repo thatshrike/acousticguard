@@ -33,8 +33,8 @@ interface DistressModel : Closeable {
 
 /**
  * TFLite adapter for the checked-in model contract:
- * - input tensor: FLOAT32 mono PCM normalized to [-1, 1]
- * - output tensor 0: FLOAT32 scores, shape [1, label_count] or [label_count]
+ * - input tensor: FLOAT32, INT8, or UINT8 mono PCM
+ * - output tensor 0: FLOAT32, INT8, or UINT8 calibrated scores
  * - assets/distress_multilingual_labels.txt: one label per output index
  *
  * A YAMNet classifier by itself does not recognize spoken words. The model used
@@ -163,6 +163,7 @@ class TfliteDistressModel(context: Context) : DistressModel {
                 }
             )
         } catch (_: Exception) {
+            model.rewind()
             Interpreter(model, Interpreter.Options().apply { setNumThreads(2) })
         }
     }

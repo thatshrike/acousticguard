@@ -6,8 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.telephony.SmsManager
 import android.util.Log
 import android.util.Base64
@@ -110,8 +108,10 @@ private class EmergencyDispatcher(private val context: Context) {
     private fun postHttps(endpoint: String, payload: String) {
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
-            connectTimeout = 8_000
-            readTimeout = 8_000
+            // Keep total receiver work bounded; durable retry belongs in a future
+            // server/WorkManager integration, not an unbounded BroadcastReceiver.
+            connectTimeout = 2_500
+            readTimeout = 5_000
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
         }
@@ -122,14 +122,6 @@ private class EmergencyDispatcher(private val context: Context) {
         } finally {
             connection.disconnect()
         }
-    }
-
-    @Suppress("UNUSED_VARIABLE")
-    private fun networkAvailable(): Boolean {
-        val manager = context.getSystemService(ConnectivityManager::class.java)
-        val network = manager.activeNetwork ?: return false
-        val capabilities = manager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     companion object {

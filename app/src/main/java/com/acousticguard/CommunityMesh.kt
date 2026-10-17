@@ -17,14 +17,12 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
-import android.util.Base64
 import android.util.Log
 import java.util.UUID
 
 object CommunityMeshBroadcaster {
     val SERVICE_UUID: UUID = UUID.fromString("3f9d6c2a-49d0-4b65-8a0f-0c9d6b9a0101")
-    private const val MANUFACTURER_ID = 0x4D47
-    private const val LEGACY_MANUFACTURER_PAYLOAD_LIMIT = 20
+    private const val LEGACY_SERVICE_PAYLOAD_LIMIT = 20
     private val handler = Handler(Looper.getMainLooper())
     private var advertiser: BluetoothLeAdvertiser? = null
     private var callback: AdvertiseCallback? = null
@@ -40,7 +38,7 @@ object CommunityMeshBroadcaster {
         if (!adapter.isEnabled) return false
         val leAdvertiser = adapter.bluetoothLeAdvertiser ?: return false
         val extended = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && adapter.isLeExtendedAdvertisingSupported
-        if (!extended && encryptedPayload.size > LEGACY_MANUFACTURER_PAYLOAD_LIMIT) return false
+        if (!extended && encryptedPayload.size > LEGACY_SERVICE_PAYLOAD_LIMIT) return false
 
         stop()
         val settingsBuilder = AdvertiseSettings.Builder()
@@ -52,7 +50,7 @@ object CommunityMeshBroadcaster {
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .addServiceUuid(ParcelUuid(SERVICE_UUID))
-            .addManufacturerData(MANUFACTURER_ID, encryptedPayload)
+            .addServiceData(ParcelUuid(SERVICE_UUID), encryptedPayload)
             .build()
         val newCallback = object : AdvertiseCallback() {
             override fun onStartFailure(errorCode: Int) {
@@ -94,7 +92,6 @@ object CommunityMeshBroadcaster {
 }
 
 object CommunityMeshScanner {
-    private const val MANUFACTURER_ID = 0x4D47
     private const val TAG = "AcousticGuardMesh"
     private var scanner: BluetoothLeScanner? = null
     private var callback: ScanCallback? = null
@@ -114,7 +111,7 @@ object CommunityMeshScanner {
         stop()
         val newCallback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
-                val payload = result.scanRecord?.manufacturerSpecificData?.get(MANUFACTURER_ID) ?: return
+                val payload = result.scanRecord?.getServiceData(ParcelUuid(CommunityMeshBroadcaster.SERVICE_UUID)) ?: return
                 val decoded = runCatching { SosPayloadCrypto(context).decrypt(payload) }.getOrNull() ?: return
                 onValidPayload(decoded)
             }
@@ -178,6 +175,6 @@ object CommunityMeshNotifier {
                 .setPriority(android.app.Notification.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .build()
-        Log.i("AcousticGuardMesh", "Authenticated nearby event ${Base64.encodeToString(payload.eventId.toString().toByteArray(), Base64.NO_WRAP)}")
+        Log.i("AcousticGuardMesh", "Authenticated nearby event received")
     }
 }

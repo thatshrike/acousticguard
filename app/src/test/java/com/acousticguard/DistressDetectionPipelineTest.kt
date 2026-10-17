@@ -33,4 +33,26 @@ class DistressDetectionPipelineTest {
         assertFalse(pipeline.evaluate(audio, true, 3_000L).validated)
         pipeline.close()
     }
+
+    @Test
+    fun fusedSpectralAndRespiratoryEvidenceUsesOnePointFiveSecondFastTrack() {
+        val model = object : DistressModel {
+            override fun infer(pcm16: ShortArray) = ModelScores(0.9f, 0f, 0.9f, listOf("screaming_vocal_friction"))
+            override fun close() = Unit
+        }
+        val pipeline = DistressDetectionPipeline(model)
+        val features = TierOneFeatures(
+            audio = AudioFeatures(0.2f, 0.2f, 0.4f, 0.03f, 0.08f, true),
+            spectral = SpectralFeatures(0.5f, true, 1f),
+            respiratory = RespiratoryFeatures(0.7f, 3_000L, 0.2f, true),
+            impact = ImpactFeatures(false, 0f, 0f, 0f, null, null, false),
+            candidate = true,
+            reasons = setOf(TierOneReason.HIGH_FREQUENCY, TierOneReason.RESPIRATORY_PERIODICITY)
+        )
+        val audio = ShortArray(56_000)
+
+        assertFalse(pipeline.evaluate(audio, features, 750L).validated)
+        assertTrue(pipeline.evaluate(audio, features, 1_500L).validated)
+        pipeline.close()
+    }
 }
