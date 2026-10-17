@@ -18,9 +18,9 @@ data class AudioFeatures(
 /** Low-cost gate. It intentionally does not allocate inside [analyze]. */
 class TierOneGate(
     private val thresholdStore: AdaptiveThresholdStore,
-    private val minimumRms: Float = 0.045f,
-    private val zcrLow: Float = 0.055f,
-    private val zcrHigh: Float = 0.45f
+    private val minimumRms: Float = 0.040f,
+    private val zcrLow: Float = 0.030f,
+    private val zcrHigh: Float = 0.55f
 ) {
     private var baselineRms = 0.025f
 
@@ -46,7 +46,8 @@ class TierOneGate(
             minimumRms,
             baselineRms * thresholdStore.rmsMultiplier()
         )
-        val anomalous = rms >= threshold && zcr in zcrLow..zcrHigh
+        val isLoudVocalSurge = (peak >= 0.28f && rms >= 0.028f) || rms >= threshold
+        val anomalous = isLoudVocalSurge && zcr in zcrLow..zcrHigh
 
         // Baseline follows ordinary ambient audio but freezes during a candidate spike.
         if (!anomalous) baselineRms = baselineRms * 0.96f + rms * 0.04f

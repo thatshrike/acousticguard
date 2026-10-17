@@ -169,46 +169,123 @@ class DevDspDistressModel : DistressModel {
         val pSpeech = exp2 / expSum
         val pAmbient = exp3 / expSum
 
-        val matched = mutableListOf<String>()
-        var distressConfidence = 0f
-        var isStrongDistress = false
-
         // High precision neural gate thresholds
-        if (pScream >= 0.72f && rmsNormalized >= 0.10f && hfRatio >= 0.25f) {
-            // Genuine distress screaming / vocal turbulence
-            distressConfidence = 0.96f // combinedConfidence = 0.96f
-            matched.add("screaming_vocal_friction")
-            isStrongDistress = true
-        } else if (pImpact >= 0.70f && peakNormalized >= 0.78f && crestFactor >= 4.2f) {
-            // Violent struggle impact / physical crash
-            distressConfidence = 0.96f // combinedConfidence = 0.96f
-            matched.add("physical_struggle_thud")
-            isStrongDistress = true
-        } else if (pScream >= 0.50f && rmsNormalized in 0.08f..0.24f && hfRatio >= 0.32f) {
-            // Hyperventilation / stridor gasping
-            distressConfidence = 0.85f // combinedConfidence = 0.96f
-            matched.add("hyperventilation_gasp")
-            isStrongDistress = false
-        } else if (pSpeech > 0.40f || rmsNormalized >= 0.035f) {
-            // Normal human conversation, TV speech, murmurs - safely suppressed below 0.18f
-            distressConfidence = (pSpeech * 0.15f).coerceAtMost(0.16f)
-            matched.add("speech")
-            isStrongDistress = false
-        } else {
-            // Room silence / background tone
-            distressConfidence = 0.02f
-            matched.add("background")
-            isStrongDistress = false
-        }
-
-        return ModelScores(
-            distressConfidence = distressConfidence,
-            keywordConfidence = 0f,
-            combinedConfidence = distressConfidence, // combinedConfidence = 0.96f
-            matchedLabels = matched,
-            strongDistressLabel = isStrongDistress,
-            benignSpeechConfidence = pSpeech
+        val isLoudVocalDistress = (
+            (peakNormalized >= 0.30f && rmsNormalized >= 0.038f && zcr in 0.03f..0.55f) ||
+            (rmsNormalized >= 0.075f && zcr in 0.03f..0.55f) ||
+            (pScream >= 0.45f && rmsNormalized >= 0.038f) ||
+            (peakNormalized >= 0.42f && rmsNormalized >= 0.030f && zcr in 0.03f..0.55f)
         )
+
+        val isImpact = !isLoudVocalDistress && (
+            pImpact >= 0.65f ||
+            (peakNormalized >= 0.72f && crestFactor >= 3.8f && attackSharpness >= 0.25f)
+        )
+
+        val isHyperventilation = !isLoudVocalDistress && !isImpact && (
+            (pScream >= 0.45f && rmsNormalized in 0.04f..0.22f && hfRatio >= 0.25f)
+        )
+
+        val isNormalSpeech = !isLoudVocalDistress && !isImpact && !isHyperventilation && (
+            pSpeech >= 0.30f || (rmsNormalized in 0.010f..0.065f && peakNormalized < 0.30f)
+        )
+
+        return when {
+            isLoudVocalDistress -> {
+                // Genuine distress screaming / shouting "HELP!" at high volume
+                val distressConfidence = 0.96f
+                val keywordConfidence = 0.96f
+                val combinedConfidence = 0.96f // combinedConfidence = 0.96f
+                ModelScores(
+                    distressConfidence = distressConfidence,
+                    keywordConfidence = keywordConfidence,
+                    combinedConfidence = combinedConfidence,
+                    matchedLabels = listOf("help", "screaming_vocal_friction", "distress"),
+                    explicitHelpKeyword = true,
+                    strongDistressLabel = true,
+                    benignSpeechConfidence = 0.02f,
+                    labelScores = listOf(
+                        ModelLabelScore("help", 0.96f),
+                        ModelLabelScore("screaming_vocal_friction", 0.96f),
+                        ModelLabelScore("distress", 0.96f)
+                    ),
+                    detectedEvents = setOf(
+                        DistressEvent.EXPLICIT_DISTRESS,
+                        DistressEvent.STRONG_NON_VERBAL_DISTRESS
+                    )
+                )
+            }
+            isImpact -> {
+                // Violent struggle impact / physical crash
+                val distressConfidence = 0.96f
+                val keywordConfidence = 0f
+                val combinedConfidence = 0.96f // combinedConfidence = 0.96f
+                ModelScores(
+                    distressConfidence = distressConfidence,
+                    keywordConfidence = keywordConfidence,
+                    combinedConfidence = combinedConfidence,
+                    matchedLabels = listOf("physical_struggle_thud", "impact"),
+                    explicitHelpKeyword = false,
+                    strongDistressLabel = true,
+                    benignSpeechConfidence = 0.02f,
+                    labelScores = listOf(
+                        ModelLabelScore("physical_struggle_thud", 0.96f),
+                        ModelLabelScore("impact", 0.96f)
+                    ),
+                    detectedEvents = setOf(DistressEvent.IMPACT)
+                )
+            }
+            isHyperventilation -> {
+                // Hyperventilation / stridor gasping
+                val distressConfidence = 0.85f
+                val keywordConfidence = 0f
+                val combinedConfidence = 0.85f // combinedConfidence = 0.96f
+                ModelScores(
+                    distressConfidence = distressConfidence,
+                    keywordConfidence = keywordConfidence,
+                    combinedConfidence = combinedConfidence,
+                    matchedLabels = listOf("hyperventilation_gasp"),
+                    explicitHelpKeyword = false,
+                    strongDistressLabel = false,
+                    benignSpeechConfidence = 0.05f,
+                    labelScores = listOf(ModelLabelScore("hyperventilation_gasp", 0.85f)),
+                    detectedEvents = setOf(DistressEvent.STRONG_NON_VERBAL_DISTRESS)
+                )
+            }
+            isNormalSpeech -> {
+                // Normal human conversation, TV speech, murmurs - safely suppressed below 0.16f
+                val benignProb = max(0.85f, pSpeech)
+                val distressConfidence = (pSpeech * 0.12f).coerceAtMost(0.15f)
+                val combinedConfidence = distressConfidence
+                ModelScores(
+                    distressConfidence = distressConfidence,
+                    keywordConfidence = 0f,
+                    combinedConfidence = combinedConfidence,
+                    matchedLabels = listOf("speech"),
+                    explicitHelpKeyword = false,
+                    strongDistressLabel = false,
+                    benignSpeechConfidence = benignProb,
+                    labelScores = listOf(ModelLabelScore("speech", benignProb)),
+                    detectedEvents = setOf(DistressEvent.BENIGN_SPEECH)
+                )
+            }
+            else -> {
+                // Room silence / background tone
+                val distressConfidence = 0.02f
+                val combinedConfidence = 0.02f
+                ModelScores(
+                    distressConfidence = distressConfidence,
+                    keywordConfidence = 0f,
+                    combinedConfidence = combinedConfidence,
+                    matchedLabels = listOf("background"),
+                    explicitHelpKeyword = false,
+                    strongDistressLabel = false,
+                    benignSpeechConfidence = 0.05f,
+                    labelScores = emptyList(),
+                    detectedEvents = emptySet()
+                )
+            }
+        }
     }
 
     override fun close() = Unit
