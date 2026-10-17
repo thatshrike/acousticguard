@@ -469,6 +469,11 @@ class AcousticCaptureService : Service() {
             reportCaptureFailure("Duress dispatch requires exact-alarm access and was not scheduled")
         }
         preAlertInFlight.set(false)
+        pipeline?.reset()
+        lastInferenceAt = 0L
+        lastRapidProbeAt = 0L
+        candidateActive = false
+        candidateGeneration++
     }
 
     private fun createAudioRecord(): AudioRecord? {
