@@ -37,6 +37,12 @@ class AcousticCaptureService : Service() {
     private lateinit var personalization: PersonalizationStore
     private lateinit var motionFusion: MotionFusion
     private lateinit var connectivityMonitor: SosConnectivityMonitor
+    private lateinit var ownerVoiceProfile: OwnerVoiceProfileStore
+    private var ownerVoiceEmbedding: VoiceEmbeddingModel? = null
+    private val ownerVoiceSampleLock = Any()
+    private lateinit var ownerVoiceSampleBuffer: CircularPcmBuffer
+    private var ownerVoiceFramesRemaining = 0
+    private val reasoningEngine = DistressReasoningEngine()
     private var pipeline: DistressDetectionPipeline? = null
     private var captureThread: Thread? = null
     private var lastInferenceAt = 0L
@@ -69,12 +75,21 @@ class AcousticCaptureService : Service() {
         gate = TierOneGate(thresholdStore)
         tierOneAnalyzer = TierOneAnalyzer(gate)
         audioBuffer = CircularPcmBuffer(BUFFER_BYTES)
+        ownerVoiceSampleBuffer = CircularPcmBuffer(OWNER_VOICE_SAMPLE_BYTES)
         locationBurst = LocationBurstManager(this)
         personalization = PersonalizationStore(this)
         motionFusion = MotionFusion(this)
         connectivityMonitor = SosConnectivityMonitor(this) {
             inferenceExecutor.execute { SosNetworkFlushBoundary(this).onConnectivityAvailable() }
         }
+        ownerVoiceProfile = EncryptedOwnerVoiceProfileStore(this)
+        ownerVoiceEmbedding = TfliteVoiceEmbeddingModel(this).let { candidate ->
+            if (candidate.isReady) candidate else {
+                candidate.close()
+                null
+            }
+        }
+        sendOwnerVoiceTelemetry()
         try {
             pipeline = createPipeline(TfliteDistressModel(this))
         } catch (error: Exception) {
@@ -116,6 +131,27 @@ class AcousticCaptureService : Service() {
                 calibrationHighFrequency = 0f
                 calibrationPeak = 0f
                 sendCalibrationTelemetry()
+                return START_STICKY
+            }
+            ACTION_START_OWNER_VOICE_ENROLLMENT -> {
+                startAsForeground()
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    sendOwnerVoiceTelemetry(status = "error", error = "Microphone permission is required")
+                    return START_NOT_STICKY
+                }
+                if (beginOwnerVoiceEnrollment()) {
+                    startCaptureSession()
+                    return START_STICKY
+                }
+                return START_NOT_STICKY
+            }
+            ACTION_CLEAR_OWNER_VOICE_PROFILE -> {
+                ownerVoiceProfile.clear()
+                synchronized(ownerVoiceSampleLock) {
+                    ownerVoiceFramesRemaining = 0
+                    ownerVoiceSampleBuffer.clear()
+                }
+                sendOwnerVoiceTelemetry(status = "cleared")
                 return START_STICKY
             }
             ACTION_CANCEL_QUIET_ALERT -> {
@@ -177,10 +213,30 @@ class AcousticCaptureService : Service() {
                 mainHandler.post { CommunityMeshNotifier.show(this, payload) }
             }
         }
+        startCaptureSession()
+        return START_STICKY
+    }
+
+    private fun startCaptureSession() {
         connectivityMonitor.start()
         motionFusion.start()
         if (running.compareAndSet(false, true)) startCapture()
-        return START_STICKY
+    }
+
+    private fun beginOwnerVoiceEnrollment(): Boolean {
+        if (ownerVoiceEmbedding == null) {
+            sendOwnerVoiceTelemetry(
+                status = "error",
+                error = "Owner voice model is not provisioned on this build"
+            )
+            return false
+        }
+        synchronized(ownerVoiceSampleLock) {
+            ownerVoiceSampleBuffer.clear()
+            ownerVoiceFramesRemaining = OWNER_VOICE_SAMPLE_FRAMES
+        }
+        sendOwnerVoiceTelemetry(status = "enrolling")
+        return true
     }
 
     private fun startAsForeground() {
@@ -234,7 +290,11 @@ class AcousticCaptureService : Service() {
     }
 
     private fun createPipeline(model: DistressModel): DistressDetectionPipeline =
-        DistressDetectionPipeline(model) { scores, features ->
+        DistressDetectionPipeline(
+            model = model,
+            reasoningEngine = reasoningEngine,
+            ownerVoiceMatcher = { pcm16, features -> matchOwnerVoice(pcm16, features) }
+        ) { scores, features ->
             if (features == null) {
                 scores
             } else {
@@ -250,6 +310,17 @@ class AcousticCaptureService : Service() {
                 personalization.adjust(motionBoost, features)
             }
         }
+
+    private fun matchOwnerVoice(pcm16: ShortArray, features: TierOneFeatures): OwnerVoiceMatch? {
+        val voiceLike = features.reasons.any {
+            it == TierOneReason.RMS_ZCR ||
+                it == TierOneReason.HIGH_FREQUENCY ||
+                it == TierOneReason.RESPIRATORY_PERIODICITY
+        }
+        if (!voiceLike) return null
+        val embedding = ownerVoiceEmbedding?.embed(pcm16) ?: return null
+        return ownerVoiceProfile.match(embedding)
+    }
 
     private fun captureLoop() {
         val recording = createAudioRecord() ?: run {
@@ -304,6 +375,7 @@ class AcousticCaptureService : Service() {
         audioBuffer.writePcm16(frame)
         val features = motionFusion.enrich(tierOneAnalyzer.analyze(frame, CAPTURE_RATE))
         collectCalibrationSample(features)
+        collectOwnerVoiceSample(frame, features)
         sendAudioTelemetry(features)
         val now = android.os.SystemClock.elapsedRealtime()
         val model = pipeline ?: return
@@ -411,11 +483,73 @@ class AcousticCaptureService : Service() {
         }
     }
 
+    private fun collectOwnerVoiceSample(frame: ShortArray, features: TierOneFeatures) {
+        val snapshot: ShortArray?
+        val remaining: Int
+        synchronized(ownerVoiceSampleLock) {
+            if (ownerVoiceFramesRemaining <= 0) return
+            ownerVoiceSampleBuffer.writePcm16(frame)
+            ownerVoiceFramesRemaining--
+            remaining = ownerVoiceFramesRemaining
+            snapshot = if (remaining == 0) {
+                ownerVoiceSampleBuffer.snapshotPcm16().also { ownerVoiceSampleBuffer.clear() }
+            } else {
+                null
+            }
+        }
+        sendOwnerVoiceTelemetry(
+            status = if (remaining == 0) "processing" else "enrolling",
+            remaining = remaining
+        )
+        if (snapshot == null) return
+        val model = ownerVoiceEmbedding ?: run {
+            sendOwnerVoiceTelemetry(status = "error", error = "Owner voice model is unavailable")
+            return
+        }
+        inferenceExecutor.execute {
+            val embedding = model.embed(snapshot)
+            if (embedding == null) {
+                sendOwnerVoiceTelemetry(status = "error", error = "Voice embedding could not be produced")
+                return@execute
+            }
+            val accepted = ownerVoiceProfile.addEnrollmentSample(
+                embedding,
+                OwnerVoiceStatistics(
+                    meanRms = features.audio.rms.coerceIn(0f, 1f),
+                    meanZeroCrossingRate = features.audio.zcr.coerceIn(0f, 1f),
+                    meanHighFrequencyRatio = (features.spectral.highFrequencyRatio ?: 0f).coerceIn(0f, 1f)
+                )
+            )
+            if (accepted) {
+                sendOwnerVoiceTelemetry(status = "enrolled")
+            } else {
+                sendOwnerVoiceTelemetry(status = "error", error = "Enrollment sample did not match the existing embedding shape")
+            }
+        }
+    }
+
     private fun sendCalibrationTelemetry(sampleCount: Int = personalization.sampleCount()) {
         sendBroadcast(Intent(ACTION_CALIBRATION_STATUS).apply {
             setPackage(packageName)
             putExtra(EXTRA_CALIBRATION_COUNT, sampleCount)
             putExtra(EXTRA_CALIBRATION_REMAINING, calibrationFramesRemaining)
+        })
+    }
+
+    private fun sendOwnerVoiceTelemetry(
+        status: String = if (ownerVoiceProfile.status().enrolled) "enrolled" else "idle",
+        remaining: Int = synchronized(ownerVoiceSampleLock) { ownerVoiceFramesRemaining },
+        error: String? = null
+    ) {
+        val profile = ownerVoiceProfile.status()
+        sendBroadcast(Intent(ACTION_OWNER_VOICE_STATUS).apply {
+            setPackage(packageName)
+            putExtra(EXTRA_OWNER_VOICE_STATUS, status)
+            putExtra(EXTRA_OWNER_VOICE_ENROLLED, profile.enrolled)
+            putExtra(EXTRA_OWNER_VOICE_SAMPLE_COUNT, profile.sampleCount)
+            putExtra(EXTRA_OWNER_VOICE_REMAINING, remaining)
+            putExtra(EXTRA_OWNER_VOICE_MODEL_AVAILABLE, ownerVoiceEmbedding != null)
+            if (error != null) putExtra(EXTRA_OWNER_VOICE_ERROR, error)
         })
     }
 
@@ -540,6 +674,8 @@ class AcousticCaptureService : Service() {
         if (::tierOneAnalyzer.isInitialized) tierOneAnalyzer.reset()
         pipeline?.close()
         pipeline = null
+        ownerVoiceEmbedding?.close()
+        ownerVoiceEmbedding = null
         super.onDestroy()
     }
 
@@ -627,9 +763,18 @@ class AcousticCaptureService : Service() {
         const val ACTION_DURESS_DISPATCH = "com.acousticguard.action.DURESS_DISPATCH"
         const val EXTRA_DURESS_LABELS = "duress_labels"
         const val ACTION_RECORD_SAFE_SAMPLE = "com.acousticguard.action.RECORD_SAFE_SAMPLE"
+        const val ACTION_START_OWNER_VOICE_ENROLLMENT = "com.acousticguard.action.START_OWNER_VOICE_ENROLLMENT"
+        const val ACTION_CLEAR_OWNER_VOICE_PROFILE = "com.acousticguard.action.CLEAR_OWNER_VOICE_PROFILE"
         const val ACTION_CALIBRATION_STATUS = "com.acousticguard.action.CALIBRATION_STATUS"
         const val EXTRA_CALIBRATION_COUNT = "calibration_count"
         const val EXTRA_CALIBRATION_REMAINING = "calibration_remaining"
+        const val ACTION_OWNER_VOICE_STATUS = "com.acousticguard.action.OWNER_VOICE_STATUS"
+        const val EXTRA_OWNER_VOICE_STATUS = "owner_voice_status"
+        const val EXTRA_OWNER_VOICE_ENROLLED = "owner_voice_enrolled"
+        const val EXTRA_OWNER_VOICE_SAMPLE_COUNT = "owner_voice_sample_count"
+        const val EXTRA_OWNER_VOICE_REMAINING = "owner_voice_remaining"
+        const val EXTRA_OWNER_VOICE_MODEL_AVAILABLE = "owner_voice_model_available"
+        const val EXTRA_OWNER_VOICE_ERROR = "owner_voice_error"
         const val ACTION_CANCEL_QUIET_ALERT = "com.acousticguard.action.CANCEL_QUIET_ALERT"
         const val ACTION_CANCEL_ALERT = "com.acousticguard.action.CANCEL_ALERT"
         const val ACTION_PRE_ALERT_RESOLVED = "com.acousticguard.action.PRE_ALERT_RESOLVED"
@@ -645,6 +790,8 @@ class AcousticCaptureService : Service() {
         private const val RAPID_PROBE_INTERVAL_MS = 750L
         private const val RESTART_DELAY_MS = 2_000L
         private const val CALIBRATION_FRAME_COUNT = 6
+        private const val OWNER_VOICE_SAMPLE_FRAMES = 6
+        private const val OWNER_VOICE_SAMPLE_BYTES = CAPTURE_RATE * 3 * 2
         private const val SENSOR_CONFIDENCE_BOOST = 0.15f
         const val STAGE_RAPID_PROBE = "rapid_probe"
         const val STAGE_RAPID_VALIDATED = "rapid_validated"

@@ -34,6 +34,7 @@ object RapidEscalationPolicy {
             features.candidate &&
             voiceLike &&
             raw.explicitHelpKeyword &&
+            hasExactEvent(raw, DistressEvent.EXPLICIT_DISTRESS) &&
             raw.keywordConfidence >= RAPID_KEYWORD_THRESHOLD &&
             adjusted.combinedConfidence >= ADJUSTED_SCORE_FLOOR
         ) {
@@ -44,6 +45,7 @@ object RapidEscalationPolicy {
             features.candidate &&
             voiceLike &&
             raw.strongDistressLabel &&
+            hasStrongDistressEvent(raw) &&
             raw.distressConfidence >= SINGLE_WINDOW_DISTRESS_THRESHOLD &&
             adjusted.combinedConfidence >= SINGLE_WINDOW_DISTRESS_THRESHOLD
         ) {
@@ -56,6 +58,7 @@ object RapidEscalationPolicy {
                 features.accelerationPeak >= MIN_ACCELERATION_PEAK &&
                 features.gyroscopePeak >= MIN_GYROSCOPE_PEAK &&
                 raw.strongDistressLabel &&
+                hasStrongDistressEvent(raw) &&
                 raw.distressConfidence >= STRONG_DISTRESS_THRESHOLD &&
                 adjusted.combinedConfidence >= ADJUSTED_SCORE_FLOOR
         if (strongImpactWithMotion) {
@@ -63,4 +66,19 @@ object RapidEscalationPolicy {
         }
         return RapidEscalationDecision(false)
     }
+
+    /**
+     * Rapid paths only accept labels from the typed taxonomy. An adapter may
+     * provide typed events, scored labels, or legacy exact matched labels; no
+     * substring matching is performed here.
+     */
+    private fun hasExactEvent(scores: ModelScores, event: DistressEvent): Boolean {
+        if (event in scores.detectedEvents) return true
+        if (scores.labelScores.any { DistressLabelTaxonomy.normalize(it.label)?.event == event }) return true
+        return scores.matchedLabels.any { DistressLabelTaxonomy.normalize(it)?.event == event }
+    }
+
+    private fun hasStrongDistressEvent(scores: ModelScores): Boolean =
+        hasExactEvent(scores, DistressEvent.STRONG_NON_VERBAL_DISTRESS) ||
+            hasExactEvent(scores, DistressEvent.IMPACT)
 }

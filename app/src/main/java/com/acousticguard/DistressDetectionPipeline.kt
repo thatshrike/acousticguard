@@ -8,7 +8,6 @@ import org.tensorflow.lite.Interpreter
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.Locale
 import kotlin.math.max
 
 data class ModelScores(
@@ -19,7 +18,13 @@ data class ModelScores(
     /** Set only by an exact canonical help label at the rapid-probe threshold. */
     val explicitHelpKeyword: Boolean = false,
     /** Set only by an exact canonical distress label at the strong-event threshold. */
-    val strongDistressLabel: Boolean = false
+    val strongDistressLabel: Boolean = false,
+    /** Optional calibrated benign-speech probability for owner-voice suppression. */
+    val benignSpeechConfidence: Float = 0f,
+    /** Typed model evidence; raw labels remain available in [matchedLabels]. */
+    val labelScores: List<ModelLabelScore> = emptyList(),
+    /** Optional typed events from a model adapter that already owns its label map. */
+    val detectedEvents: Set<DistressEvent> = emptySet()
 )
 
 data class PipelineResult(
@@ -30,7 +35,9 @@ data class PipelineResult(
     val tierOneReasons: Set<TierOneReason> = emptySet(),
     val fastTrack: Boolean = false,
     val rawScores: ModelScores? = null,
-    val rapidReason: RapidEscalationReason? = null
+    val rapidReason: RapidEscalationReason? = null,
+    val reasoningPath: DistressReasoningPath? = null,
+    val ownerVoiceDecision: OwnerVoiceDecision? = null
 )
 
 interface DistressModel : Closeable {
@@ -114,27 +121,45 @@ class TfliteDistressModel(context: Context) : DistressModel {
 
         var distress = 0f
         var keyword = 0f
+        var benignSpeech = 0f
         val matched = mutableListOf<String>()
+        val labelScores = mutableListOf<ModelLabelScore>()
+        val detectedEvents = mutableSetOf<DistressEvent>()
         labels.forEachIndexed { index, rawLabel ->
-            val label = rawLabel.lowercase(Locale.ROOT)
             val score = scores[index]
-            val distressLabel = DISTRESS_TERMS.any(label::contains)
-            val keywordLabel = HELP_TERMS.any(label::contains)
-            if (distressLabel) distress = max(distress, score)
-            if (keywordLabel) keyword = max(keyword, score)
-            if (score >= 0.82f && (distressLabel || keywordLabel)) matched += rawLabel
+            val normalized = DistressLabelTaxonomy.normalize(rawLabel)
+            if (normalized != null) {
+                labelScores += ModelLabelScore(rawLabel, score)
+                when (normalized.event) {
+                    DistressEvent.BENIGN_SPEECH -> benignSpeech = max(benignSpeech, score)
+                    DistressEvent.EXPLICIT_DISTRESS -> keyword = max(keyword, score)
+                    DistressEvent.STRONG_NON_VERBAL_DISTRESS,
+                    DistressEvent.IMPACT,
+                    DistressEvent.DURESS -> distress = max(distress, score)
+                }
+                if (score >= 0.82f) {
+                    matched += rawLabel
+                    detectedEvents += normalized.event
+                }
+            }
         }
         return ModelScores(
             distressConfidence = distress,
             keywordConfidence = keyword,
             combinedConfidence = max(distress, keyword),
             matchedLabels = matched,
-            explicitHelpKeyword = labels.withIndex().any { (index, rawLabel) ->
-                isCanonicalHelpLabel(rawLabel) && scores[index] >= RapidEscalationPolicy.RAPID_KEYWORD_THRESHOLD
+            explicitHelpKeyword = labelScores.any { label ->
+                DistressLabelTaxonomy.normalize(label.label)?.event == DistressEvent.EXPLICIT_DISTRESS &&
+                    label.score >= RapidEscalationPolicy.RAPID_KEYWORD_THRESHOLD
             },
-            strongDistressLabel = labels.withIndex().any { (index, rawLabel) ->
-                isCanonicalDistressLabel(rawLabel) && scores[index] >= RapidEscalationPolicy.STRONG_DISTRESS_THRESHOLD
-            }
+            strongDistressLabel = labelScores.any { label ->
+                val event = DistressLabelTaxonomy.normalize(label.label)?.event
+                (event == DistressEvent.STRONG_NON_VERBAL_DISTRESS || event == DistressEvent.IMPACT) &&
+                    label.score >= RapidEscalationPolicy.STRONG_DISTRESS_THRESHOLD
+            },
+            benignSpeechConfidence = benignSpeech,
+            labelScores = labelScores,
+            detectedEvents = detectedEvents
         )
     }
 
@@ -181,28 +206,6 @@ class TfliteDistressModel(context: Context) : DistressModel {
         }
     }
 
-    private fun isCanonicalHelpLabel(rawLabel: String): Boolean =
-        HELP_TERMS.contains(rawLabel.trim().lowercase(Locale.ROOT))
-
-    private fun isCanonicalDistressLabel(rawLabel: String): Boolean =
-        STRONG_DISTRESS_TERMS.contains(rawLabel.trim().lowercase(Locale.ROOT))
-
-    companion object {
-        private val DISTRESS_TERMS = setOf(
-            "distress", "scream", "cry", "sob", "hyperventilation", "struggle", "panic",
-            "screaming_vocal_friction", "hyperventilation_gasp", "physical_struggle_thud",
-            "physical_restraint_groan", "suffocation_stridor"
-        )
-        private val STRONG_DISTRESS_TERMS = setOf(
-            "distress", "scream", "cry", "sob", "hyperventilation", "struggle", "panic",
-            "screaming_vocal_friction", "hyperventilation_gasp", "physical_struggle_thud",
-            "physical_restraint_groan", "suffocation_stridor"
-        )
-        private val HELP_TERMS = setOf(
-            "help", "help me", "madad", "मदद", "bachao", "bachaao", "बचाओ",
-            "sahayata", "सहायता", "amader bachao", "banchao", "udavi", "sahaaya"
-        )
-    }
 }
 
 /**
@@ -214,6 +217,8 @@ class DistressDetectionPipeline(
     private val confidenceThreshold: Float = 0.82f,
     private val requiredWindows: Int = 2,
     private val evaluationWindowMs: Long = 1_500L,
+    private val reasoningEngine: DistressReasoningEngine? = null,
+    private val ownerVoiceMatcher: ((ShortArray, TierOneFeatures) -> OwnerVoiceMatch?)? = null,
     private val scoreAdjuster: (ModelScores, TierOneFeatures?) -> ModelScores = { scores, _ -> scores }
 ) : Closeable {
     private var lastEvaluationAt = 0L
@@ -248,15 +253,23 @@ class DistressDetectionPipeline(
         return try {
             val rawScores = model.infer(pcm16)
             val adjustedScores = scoreAdjuster(rawScores, tierOne)
+            val reasoning = reasoningEngine?.decide(
+                adjustedScores,
+                tierOne,
+                ownerVoiceMatcher?.invoke(pcm16, tierOne)
+            )
             val decision = RapidEscalationPolicy.decide(tierOne, rawScores, adjustedScores)
+            val protectedFromSuppression = reasoning?.suppressionAllowed != true
             PipelineResult(
                 scores = adjustedScores,
                 consecutiveQualifyingWindows = consecutiveQualifying,
-                validated = decision.shouldPreAlert,
+                validated = decision.shouldPreAlert && protectedFromSuppression,
                 tierOneReasons = tierOne.reasons,
                 fastTrack = tierOne.fastTrack,
                 rawScores = rawScores,
-                rapidReason = decision.reason
+                rapidReason = if (protectedFromSuppression) decision.reason else null,
+                reasoningPath = reasoning?.path,
+                ownerVoiceDecision = reasoning?.ownerVoiceDecision
             )
         } catch (error: Exception) {
             PipelineResult(
@@ -292,7 +305,15 @@ class DistressDetectionPipeline(
         return try {
             val rawScores = model.infer(pcm16)
             val scores = scoreAdjuster(rawScores, tierOne)
-            if (scores.combinedConfidence >= confidenceThreshold) {
+            val reasoning = tierOne?.let {
+                reasoningEngine?.decide(
+                    scores,
+                    it,
+                    ownerVoiceMatcher?.invoke(pcm16, it)
+                )
+            }
+            val suppressed = reasoning?.suppressionAllowed == true
+            if (scores.combinedConfidence >= confidenceThreshold && !suppressed) {
                 consecutiveQualifying++
             } else {
                 consecutiveQualifying = 0
@@ -304,7 +325,9 @@ class DistressDetectionPipeline(
                 validated = validated,
                 tierOneReasons = reasons,
                 fastTrack = fastTrack,
-                rawScores = rawScores
+                rawScores = rawScores,
+                reasoningPath = reasoning?.path,
+                ownerVoiceDecision = reasoning?.ownerVoiceDecision
             )
         } catch (error: Exception) {
             consecutiveQualifying = 0

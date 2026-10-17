@@ -86,4 +86,40 @@ class DistressDetectionPipelineTest {
         assertTrue(standard.consecutiveQualifyingWindows == 1)
         pipeline.close()
     }
+
+    @Test
+    fun ownerVoiceOnlySuppressesTypedBenignSpeech() {
+        val model = object : DistressModel {
+            override fun infer(pcm16: ShortArray) = ModelScores(
+                distressConfidence = 0.02f,
+                keywordConfidence = 0f,
+                combinedConfidence = 0.9f,
+                matchedLabels = listOf("conversation"),
+                benignSpeechConfidence = 0.95f,
+                labelScores = listOf(ModelLabelScore("conversation", 0.95f))
+            )
+
+            override fun close() = Unit
+        }
+        val pipeline = DistressDetectionPipeline(
+            model = model,
+            reasoningEngine = DistressReasoningEngine(),
+            ownerVoiceMatcher = { _, _ ->
+                OwnerVoiceMatch(enrolled = true, similarity = 0.95f, matched = true)
+            }
+        )
+        val features = TierOneFeatures(
+            audio = AudioFeatures(0.2f, 0.2f, 0.4f, 0.03f, 0.08f, true),
+            spectral = SpectralFeatures(0.5f, true, 1f),
+            respiratory = RespiratoryFeatures(null, null, 0f, false),
+            impact = ImpactFeatures(false, 0f, 0f, 0f, null, null, false),
+            candidate = true,
+            reasons = setOf(TierOneReason.RMS_ZCR)
+        )
+
+        val result = pipeline.evaluate(ShortArray(56_000), features, 1_500L)
+        assertFalse(result.validated)
+        assertTrue(result.reasoningPath == DistressReasoningPath.BENIGN_SPEECH_OWNER_SUPPRESSED)
+        pipeline.close()
+    }
 }

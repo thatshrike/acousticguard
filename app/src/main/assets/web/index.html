@@ -323,6 +323,160 @@
     .text-gold-dim { color: var(--gold-dim); }
     .text-emerald { color: var(--emerald); }
     .text-ruby { color: var(--ruby); }
+
+    /* -------------------------------------------------------------
+       CONSISTENCY, ACCESSIBILITY & MOTION POLISH
+       ------------------------------------------------------------- */
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input {
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    button,
+    .nav-tab,
+    [role="button"] {
+      touch-action: manipulation;
+    }
+
+    :where(button, input, .nav-tab, [role="button"]):focus-visible {
+      outline: 2px solid var(--gold-light);
+      outline-offset: 3px;
+      box-shadow: 0 0 0 5px rgba(245, 227, 190, 0.16), 0 0 22px rgba(245, 227, 190, 0.28);
+    }
+
+    :where(button, input, .nav-tab, [role="button"]):focus:not(:focus-visible) {
+      outline: none;
+    }
+
+    .liquid-pill {
+      color: var(--text-primary);
+      transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+        background 180ms ease, border-color 180ms ease, box-shadow 180ms ease,
+        opacity 180ms ease;
+    }
+
+    button.liquid-pill:hover,
+    .liquid-pill[role="button"]:hover,
+    .nav-tab:hover {
+      border-color: rgba(255, 255, 255, 0.32);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.07) 100%), rgba(30, 36, 50, 0.72);
+      transform: translateY(-1px);
+    }
+
+    button.liquid-pill:active,
+    .liquid-pill[role="button"]:active,
+    .nav-tab:active {
+      transform: scale(0.98);
+    }
+
+    button.liquid-pill:disabled {
+      cursor: wait;
+      opacity: 0.58;
+      transform: none;
+    }
+
+    .liquid-glass,
+    .liquid-glass-subtle {
+      overflow: hidden;
+    }
+
+    .tab-panel:not(.hidden) {
+      animation: tab-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @keyframes tab-enter {
+      from { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.992); }
+      to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+    }
+
+    .nav-tab {
+      min-height: 48px;
+      border-radius: 9999px;
+      transition: color 180ms ease, transform 180ms ease, background 180ms ease;
+    }
+
+    .active-indicator {
+      transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .modal-backdrop {
+      background: rgba(4, 6, 10, 0.78) !important;
+      overscroll-behavior: contain;
+    }
+
+    .modal-backdrop:not(.hidden) {
+      animation: modal-fade 220ms ease both;
+    }
+
+    .modal-shell {
+      animation: modal-rise 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @keyframes modal-fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes modal-rise {
+      from { opacity: 0; transform: translateY(12px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .owner-voice-card {
+      border-color: rgba(245, 227, 190, 0.2);
+    }
+
+    .owner-voice-badge {
+      min-width: 66px;
+      padding: 6px 9px;
+      border: 1px solid rgba(245, 227, 190, 0.24);
+      border-radius: 9999px;
+      background: rgba(245, 227, 190, 0.09);
+      color: var(--gold-light);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .owner-voice-secondary {
+      color: var(--text-secondary) !important;
+      background: rgba(255, 255, 255, 0.06) !important;
+      border-color: rgba(255, 255, 255, 0.14) !important;
+    }
+
+    body.modal-open {
+      overflow: hidden;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+
+      .glass-specular-shimmer::before,
+      .animate-ping-glow {
+        animation: none !important;
+      }
+
+      .tab-panel:not(.hidden) {
+        animation: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -343,7 +497,7 @@
   <header class="fixed top-0 w-full z-40 pt-safe" style="background:rgba(7,9,14,0.72); backdrop-filter:blur(30px) saturate(200%); -webkit-backdrop-filter:blur(30px) saturate(200%); border-bottom:1px solid rgba(255,255,255,0.08);">
     <div style="height:62px; padding:0 20px; display:flex; align-items:center; justify-content:space-between; max-width:440px; margin:0 auto; width:100%;">
       <div class="flex items-center" style="gap:12px;">
-        <div class="w-9 h-9 rounded-2xl liquid-pill flex items-center justify-center text-gold cursor-pointer" id="brandLogoBtn" style="width:36px; height:36px;">
+        <div class="w-9 h-9 rounded-2xl liquid-pill flex items-center justify-center text-gold cursor-pointer" id="brandLogoBtn" role="button" tabindex="0" aria-label="AcousticGuard home" style="width:36px; height:36px;">
           <!-- graphic_eq icon -->
           <svg class="icon" viewBox="0 0 24 24" style="font-size:18px;"><path d="M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z"/></svg>
         </div>
@@ -353,11 +507,11 @@
         </div>
       </div>
       <div class="flex items-center" style="gap:8px;">
-        <button class="liquid-pill flex items-center" style="padding:7px 14px; border-radius:9999px; font-size:11px; font-weight:600; color:#e2e8f0; gap:6px; cursor:pointer;" id="viewReferenceBtn">
+        <button type="button" class="liquid-pill flex items-center" style="padding:7px 14px; border-radius:9999px; font-size:11px; font-weight:600; color:#e2e8f0; gap:6px; cursor:pointer;" id="viewReferenceBtn" aria-haspopup="dialog" aria-controls="referenceModal">
           <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:13px;"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
           <span>Telemetry</span>
         </button>
-        <div class="rounded-full liquid-pill flex items-center justify-center text-stone-300 cursor-pointer" id="fingerprintBtn" style="width:36px; height:36px;">
+        <div class="rounded-full liquid-pill flex items-center justify-center text-stone-300 cursor-pointer" id="fingerprintBtn" role="button" tabindex="0" aria-label="Open de-escalation PIN" aria-haspopup="dialog" aria-controls="pinModal" style="width:36px; height:36px;">
           <svg class="icon" viewBox="0 0 24 24" style="font-size:17px;"><path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.47-5.57 1.41-.24.13-.54.04-.68-.2-.13-.24-.04-.55.2-.68C7.82 2.52 9.86 2 12.01 2c2.13 0 3.99.47 6.03 1.52.25.13.34.43.21.67-.09.18-.26.28-.44.28zM3.5 9.72c-.1 0-.2-.03-.29-.09-.23-.16-.28-.47-.12-.7.99-1.4 2.25-2.5 3.75-3.27C9.9 4.04 14.1 4.04 17.14 5.66c1.51.77 2.76 1.86 3.75 3.25.16.22.11.54-.12.7-.23.16-.54.11-.7-.12-.9-1.26-2.04-2.25-3.41-2.95-2.75-1.47-6.55-1.47-9.3 0-1.37.7-2.52 1.69-3.42 2.95-.1.15-.26.23-.44.23zm8.51 12.28c-.1 0-.2 0-.29-.01-4.01-.44-6.84-2.88-6.84-6.79 0-.28.22-.5.5-.5s.5.22.5.5c0 3.39 2.44 5.48 5.96 5.86.27.03.47.27.44.54-.02.26-.24.4-.47.4zm7.61-4.99c-.11 0-.22-.04-.31-.11-.22-.17-.26-.48-.09-.7.86-1.12 1.32-2.5 1.32-3.99 0-3.95-3.1-7.16-6.92-7.16-3.81 0-6.92 3.21-6.92 7.16 0 1.5.47 2.87 1.34 4 .17.22.13.53-.09.7-.22.17-.53.13-.7-.09-1.01-1.31-1.55-2.92-1.55-4.61 0-4.5 3.55-8.16 7.92-8.16 4.37 0 7.92 3.66 7.92 8.16 0 1.7-.52 3.29-1.5 4.58-.1.14-.26.22-.42.22zm-4.32 1.85c-.09 0-.18-.02-.27-.07-2.61-1.39-4.22-4.04-4.22-7.07 0-1.65 1.35-3 3-3s3 1.35 3 3c0 2.21 1.79 4 4 4 .28 0 .5.22.5.5s-.22.5-.5.5c-2.76 0-5-2.24-5-5 0-1.1-.9-2-2-2s-2 .9-2 2c0 2.58 1.37 4.84 3.6 6.03.24.13.34.43.21.68-.09.18-.27.28-.45.28z"/></svg>
         </div>
       </div>
@@ -368,7 +522,7 @@
   <main style="max-width:440px; margin:0 auto; width:100%; padding:88px 18px 140px 18px; display:flex; flex-direction:column; gap:16px; position:relative; z-index:10;">
 
     <!-- TAB 1: HAVEN (MAIN DASHBOARD) -->
-    <div id="tabContentHaven" class="flex flex-col" style="gap:16px;">
+    <div id="tabContentHaven" class="tab-panel flex flex-col" role="tabpanel" aria-labelledby="navHaven" aria-hidden="false" style="gap:16px;">
       
       <!-- 1. HERO: LIQUID GLASS SCULPTED STATUS CARD -->
       <section class="liquid-glass flex flex-col items-center text-center" id="heroCard" style="padding:28px 22px;">
@@ -459,7 +613,7 @@
               <div style="font-size:11px; color:var(--text-secondary);">Haptic only; zero display lighting during alerts</div>
             </div>
           </div>
-          <button class="custom-switch" id="ghostSwitch" type="button" aria-checked="false">
+           <button class="custom-switch" id="ghostSwitch" type="button" role="switch" aria-label="Ghost Mode" aria-checked="false">
             <span class="custom-switch-knob" id="ghostKnob"></span>
           </button>
         </div>
@@ -475,13 +629,13 @@
               <div style="font-size:11px; color:var(--text-secondary);">Bluetooth circle fallback if cellular drops</div>
             </div>
           </div>
-          <button class="custom-switch" id="meshSwitch" type="button" aria-checked="false">
+           <button class="custom-switch" id="meshSwitch" type="button" role="switch" aria-label="Peer Relay Mesh" aria-checked="false">
             <span class="custom-switch-knob" id="meshKnob"></span>
           </button>
         </div>
 
         <!-- Safe PIN Row -->
-        <div class="flex items-center justify-between relative z-10 cursor-pointer" id="pinRow" style="padding:16px 18px;">
+        <div class="flex items-center justify-between relative z-10 cursor-pointer" id="pinRow" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="pinModal" style="padding:16px 18px;">
           <div class="flex items-center" style="gap:12px;">
             <div class="rounded-xl liquid-pill flex items-center justify-center text-stone-300" style="width:36px; height:36px;">
               <svg class="icon" viewBox="0 0 24 24" style="font-size:17px;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 4h2v2h-2V7zm0 4h2v2h-2v-2zm-4-4h2v2H7V7zm0 4h2v2H7v-2zm-2 6v-2h14v2H5zm12-6h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
@@ -501,7 +655,7 @@
       <!-- 4. ENGINE TELEMETRY ACCORDION -->
       <section class="liquid-glass-subtle overflow-hidden flex flex-col">
         <div class="glass-specular-shimmer"></div>
-        <button class="flex items-center justify-between text-left cursor-pointer relative z-10" id="vitalityAccordionBtn" style="padding:16px 18px; width:100%; background:none; border:none; color:inherit;">
+        <button type="button" class="flex items-center justify-between text-left cursor-pointer relative z-10" id="vitalityAccordionBtn" aria-expanded="false" aria-controls="vitalityContent" style="padding:16px 18px; width:100%; background:none; border:none; color:inherit;">
           <div class="flex items-center" style="gap:12px;">
             <div class="rounded-xl liquid-pill flex items-center justify-center text-stone-300" style="width:36px; height:36px;">
               <svg class="icon" viewBox="0 0 24 24" style="font-size:17px;"><path d="M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.28-10.43zM10.59 15.41a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z"/></svg>
@@ -556,7 +710,7 @@
     </div>
 
     <!-- TAB 2: AUDIO / NEURAL CALIBRATION -->
-    <div id="tabContentAudio" class="hidden flex flex-col" style="gap:16px;">
+    <div id="tabContentAudio" class="tab-panel hidden flex flex-col" role="tabpanel" aria-labelledby="navAudio" aria-hidden="true" style="gap:16px;">
       <section class="liquid-glass flex flex-col" style="padding:24px 20px; gap:16px;">
         <div class="glass-specular-shimmer"></div>
         <div class="relative z-10">
@@ -585,6 +739,41 @@
         </div>
       </section>
 
+       <section class="liquid-glass-subtle owner-voice-card flex flex-col" id="ownerVoiceCard" style="padding:20px 18px; gap:14px;">
+         <div class="glass-specular-shimmer"></div>
+         <div class="flex items-start justify-between relative z-10" style="gap:12px;">
+           <div class="flex items-start" style="gap:12px;">
+             <div class="rounded-2xl liquid-pill flex items-center justify-center text-gold" aria-hidden="true" style="width:42px; height:42px; flex-shrink:0;">
+               <svg class="icon" viewBox="0 0 24 24" style="font-size:20px;"><path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zm-5 8a1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0zm5 9h2v2h-2v-2z"/></svg>
+             </div>
+             <div>
+               <h3 style="font-size:14px; font-weight:600; color:#ffffff;">Owner Voice Profile</h3>
+               <p style="font-size:11px; line-height:1.45; color:var(--text-secondary); margin-top:3px;">A private voice signature helps reduce false triggers from familiar speech.</p>
+             </div>
+           </div>
+           <span class="owner-voice-badge" id="ownerVoiceStatePill">Not set</span>
+         </div>
+
+         <div class="liquid-pill rounded-2xl flex items-center justify-between relative z-10" style="padding:13px 14px; gap:12px;">
+           <div>
+             <div id="ownerVoiceStatusLabel" style="font-size:12px; font-weight:600; color:#ffffff;">No profile enrolled</div>
+             <div id="ownerVoiceStatusMeta" class="font-mono" style="font-size:10px; color:var(--text-secondary); margin-top:3px;">Ready for an on-device enrollment</div>
+           </div>
+           <svg class="icon text-gold" aria-hidden="true" viewBox="0 0 24 24" style="font-size:18px; flex-shrink:0;"><path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zm-5 8a1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0zm5 9h2v2h-2v-2z"/></svg>
+         </div>
+
+         <div class="flex flex-col relative z-10" style="gap:8px;">
+           <button type="button" class="liquid-pill rounded-2xl flex items-center justify-center cursor-pointer" id="ownerVoiceActionBtn" style="padding:14px 16px; font-size:12px; font-weight:600; gap:8px; color:#ffffff;">
+             <svg class="icon text-gold" aria-hidden="true" viewBox="0 0 24 24" style="font-size:17px;"><path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zm-5 8a1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0zm5 9h2v2h-2v-2z"/></svg>
+             <span id="ownerVoiceActionText">Start Owner Voice Enrollment</span>
+           </button>
+           <button type="button" class="liquid-pill owner-voice-secondary rounded-2xl flex items-center justify-center cursor-pointer hidden" id="clearOwnerVoiceBtn" style="padding:11px 16px; font-size:11px; font-weight:600; gap:8px;">
+             <span id="clearOwnerVoiceText">Clear Owner Voice Profile</span>
+           </button>
+         </div>
+         <p class="relative z-10" id="ownerVoiceStatus" role="status" aria-live="polite" style="font-size:10px; line-height:1.4; color:var(--text-tertiary);">Voice features remain on this device.</p>
+       </section>
+
       <section class="liquid-glass-subtle flex flex-col" style="padding:20px 18px; gap:12px;">
         <div class="glass-specular-shimmer"></div>
         <h3 style="font-size:14px; font-weight:600; color:#ffffff;" class="relative z-10">Dynamic Environmental Learning</h3>
@@ -595,7 +784,7 @@
     </div>
 
     <!-- TAB 3: CIRCLE / EMERGENCY DISPATCH -->
-    <div id="tabContentCircle" class="hidden flex flex-col" style="gap:16px;">
+    <div id="tabContentCircle" class="tab-panel hidden flex flex-col" role="tabpanel" aria-labelledby="navCircle" aria-hidden="true" style="gap:16px;">
       <section class="liquid-glass flex flex-col" style="padding:24px 20px; gap:16px;">
         <div class="glass-specular-shimmer"></div>
         <div class="relative z-10">
@@ -636,7 +825,7 @@
     </div>
 
     <!-- TAB 4: SETTINGS / DEFENSIVE CONTROLS -->
-    <div id="tabContentSettings" class="hidden flex flex-col" style="gap:16px;">
+    <div id="tabContentSettings" class="tab-panel hidden flex flex-col" role="tabpanel" aria-labelledby="navSettings" aria-hidden="true" style="gap:16px;">
       <section class="liquid-glass flex flex-col" style="padding:24px 20px; gap:16px;">
         <div class="glass-specular-shimmer"></div>
         <div class="relative z-10">
@@ -688,14 +877,14 @@
   </main>
 
   <!-- PIN CONFIGURATION MODAL -->
-  <div class="hidden fixed inset-0 z-50 flex items-center justify-center p-5" id="pinModal" style="background:rgba(0,0,0,0.85); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); padding:20px;">
-    <div class="liquid-glass overflow-hidden flex flex-col" style="max-width:340px; width:100%; border:1px solid rgba(255,255,255,0.22);">
+  <div class="hidden fixed inset-0 z-50 flex items-center justify-center p-5 modal-backdrop" id="pinModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="pinModalTitle" tabindex="-1" style="background:rgba(0,0,0,0.85); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); padding:20px;">
+    <div class="liquid-glass modal-shell overflow-hidden flex flex-col" style="max-width:340px; width:100%; border:1px solid rgba(255,255,255,0.22);">
       <div class="flex items-center justify-between" style="padding:18px; border-bottom:1px solid rgba(255,255,255,0.1);">
         <div class="flex items-center" style="gap:8px;">
           <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:18px;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 4h2v2h-2V7zm0 4h2v2h-2v-2zm-4-4h2v2H7V7zm0 4h2v2H7v-2zm-2 6v-2h14v2H5zm12-6h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
-          <span class="font-serif" style="font-size:17px; color:#ffffff;">De-escalation PIN</span>
+          <span class="font-serif" id="pinModalTitle" style="font-size:17px; color:#ffffff;">De-escalation PIN</span>
         </div>
-        <button class="liquid-pill rounded-full flex items-center justify-center text-stone-300 cursor-pointer" id="closePinModalBtn" style="width:30px; height:30px; border:none;">
+        <button type="button" class="liquid-pill rounded-full flex items-center justify-center text-stone-300 cursor-pointer" id="closePinModalBtn" aria-label="Close PIN dialog" style="width:30px; height:30px; border:none;">
           <svg class="icon" viewBox="0 0 24 24" style="font-size:16px;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </div>
@@ -707,7 +896,7 @@
         <p class="font-mono" style="font-size:10px; line-height:1.4; color:var(--text-tertiary);">
           💡 Duress feature: entering the reverse of this PIN aborts the countdown visibly while secretly dispatching an immediate SOS.
         </p>
-        <button class="liquid-pill rounded-xl cursor-pointer" id="savePinModalBtn" style="padding:13px; font-size:12px; font-weight:600; width:100%; color:#ffffff;">
+        <button type="button" class="liquid-pill rounded-xl cursor-pointer" id="savePinModalBtn" style="padding:13px; font-size:12px; font-weight:600; width:100%; color:#ffffff;">
           Save PIN
         </button>
       </div>
@@ -715,14 +904,14 @@
   </div>
 
   <!-- BASELINE REFERENCE MODAL -->
-  <div class="hidden fixed inset-0 z-50 flex items-center justify-center p-5" id="referenceModal" style="background:rgba(0,0,0,0.85); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); padding:20px;">
-    <div class="liquid-glass overflow-hidden flex flex-col" style="max-width:340px; width:100%; border:1px solid rgba(255,255,255,0.22); max-height:80vh;">
+  <div class="hidden fixed inset-0 z-50 flex items-center justify-center p-5 modal-backdrop" id="referenceModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="referenceModalTitle" tabindex="-1" style="background:rgba(0,0,0,0.85); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); padding:20px;">
+    <div class="liquid-glass modal-shell overflow-hidden flex flex-col" style="max-width:340px; width:100%; border:1px solid rgba(255,255,255,0.22); max-height:80vh;">
       <div class="flex items-center justify-between" style="padding:18px; border-bottom:1px solid rgba(255,255,255,0.1);">
         <div class="flex items-center" style="gap:8px;">
           <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:17px;"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z"/></svg>
-          <span class="font-serif" style="font-size:17px; color:#ffffff;">Telemetry &amp; Engine Spec</span>
+          <span class="font-serif" id="referenceModalTitle" style="font-size:17px; color:#ffffff;">Telemetry &amp; Engine Spec</span>
         </div>
-        <button class="liquid-pill rounded-full flex items-center justify-center text-stone-300 cursor-pointer" id="closeReferenceBtn" style="width:30px; height:30px; border:none;">
+        <button type="button" class="liquid-pill rounded-full flex items-center justify-center text-stone-300 cursor-pointer" id="closeReferenceBtn" aria-label="Close telemetry dialog" style="width:30px; height:30px; border:none;">
           <svg class="icon" viewBox="0 0 24 24" style="font-size:16px;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </div>
@@ -749,28 +938,28 @@
     <nav class="liquid-nav-pill" id="bottomNav">
       
       <!-- Haven Tab -->
-      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-gold cursor-pointer" data-tab="haven" style="padding:6px 0; gap:3px; text-decoration:none;">
+      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-gold cursor-pointer" id="navHaven" data-tab="haven" role="tab" tabindex="0" aria-selected="true" aria-controls="tabContentHaven" style="padding:6px 0; gap:3px; text-decoration:none;">
         <div class="active-indicator" style="position:absolute; inset:0; border-radius:9999px; background:rgba(255,255,255,0.11); border:1px solid rgba(255,255,255,0.25); box-shadow:0 0 14px rgba(245,227,190,0.22); pointer-events:none;"></div>
         <svg class="icon nav-icon" viewBox="0 0 24 24" style="font-size:20px; filter:drop-shadow(0 0 8px rgba(245,227,190,0.55));"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
         <span class="font-mono nav-label" style="font-size:9px; letter-spacing:0.1em; text-transform:uppercase; font-weight:700;">Haven</span>
       </a>
 
       <!-- Audio Tab -->
-      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-stone-400 cursor-pointer" data-tab="audio" style="padding:6px 0; gap:3px; text-decoration:none;">
+      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-stone-400 cursor-pointer" id="navAudio" data-tab="audio" role="tab" tabindex="0" aria-selected="false" aria-controls="tabContentAudio" style="padding:6px 0; gap:3px; text-decoration:none;">
         <div class="active-indicator hidden" style="position:absolute; inset:0; border-radius:9999px; background:rgba(255,255,255,0.11); border:1px solid rgba(255,255,255,0.25); box-shadow:0 0 14px rgba(245,227,190,0.22); pointer-events:none;"></div>
         <svg class="icon nav-icon" viewBox="0 0 24 24" style="font-size:20px;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
         <span class="font-mono nav-label" style="font-size:9px; letter-spacing:0.1em; text-transform:uppercase; font-weight:500;">Audio</span>
       </a>
 
       <!-- Circle Tab -->
-      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-stone-400 cursor-pointer" data-tab="circle" style="padding:6px 0; gap:3px; text-decoration:none;">
+      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-stone-400 cursor-pointer" id="navCircle" data-tab="circle" role="tab" tabindex="0" aria-selected="false" aria-controls="tabContentCircle" style="padding:6px 0; gap:3px; text-decoration:none;">
         <div class="active-indicator hidden" style="position:absolute; inset:0; border-radius:9999px; background:rgba(255,255,255,0.11); border:1px solid rgba(255,255,255,0.25); box-shadow:0 0 14px rgba(245,227,190,0.22); pointer-events:none;"></div>
         <svg class="icon nav-icon" viewBox="0 0 24 24" style="font-size:20px;"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
         <span class="font-mono nav-label" style="font-size:9px; letter-spacing:0.1em; text-transform:uppercase; font-weight:500;">Circle</span>
       </a>
 
       <!-- Settings Tab -->
-      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-stone-400 cursor-pointer" data-tab="settings" style="padding:6px 0; gap:3px; text-decoration:none;">
+      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-stone-400 cursor-pointer" id="navSettings" data-tab="settings" role="tab" tabindex="0" aria-selected="false" aria-controls="tabContentSettings" style="padding:6px 0; gap:3px; text-decoration:none;">
         <div class="active-indicator hidden" style="position:absolute; inset:0; border-radius:9999px; background:rgba(255,255,255,0.11); border:1px solid rgba(255,255,255,0.25); box-shadow:0 0 14px rgba(245,227,190,0.22); pointer-events:none;"></div>
         <svg class="icon nav-icon" viewBox="0 0 24 24" style="font-size:20px;"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
         <span class="font-mono nav-label" style="font-size:9px; letter-spacing:0.1em; text-transform:uppercase; font-weight:500;">Settings</span>
@@ -788,6 +977,8 @@
       let currentDb = 34.3;
       let lastTelemetryReceivedTime = 0;
       let currentPin = "1234";
+      const reducedMotionQuery = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+      const prefersReducedMotion = () => Boolean(reducedMotionQuery && reducedMotionQuery.matches);
 
       const toggleRestBtn = document.getElementById('toggleRestBtn');
       const toggleRestLabel = document.getElementById('toggleRestLabel');
@@ -836,6 +1027,13 @@
       const audioSampleStatus = document.getElementById('audioSampleStatus');
       const audioSampleCountPill = document.getElementById('audioSampleCountPill');
       const audioCalibrationMsg = document.getElementById('audioCalibrationMsg');
+      const ownerVoiceActionBtn = document.getElementById('ownerVoiceActionBtn');
+      const ownerVoiceActionText = document.getElementById('ownerVoiceActionText');
+      const clearOwnerVoiceBtn = document.getElementById('clearOwnerVoiceBtn');
+      const ownerVoiceStatus = document.getElementById('ownerVoiceStatus');
+      const ownerVoiceStatusLabel = document.getElementById('ownerVoiceStatusLabel');
+      const ownerVoiceStatusMeta = document.getElementById('ownerVoiceStatusMeta');
+      const ownerVoiceStatePill = document.getElementById('ownerVoiceStatePill');
 
       // Circle Tab elements
       const circlePhoneInput = document.getElementById('circlePhoneInput');
@@ -851,6 +1049,41 @@
       const keyVersionText = document.getElementById('keyVersionText');
       const diagNativeAudio = document.getElementById('diagNativeAudio');
       const diagMeshStatus = document.getElementById('diagMeshStatus');
+
+      let activeModal = null;
+      let lastFocusedElement = null;
+
+      function focusWithoutJump(element) {
+        if (!element || typeof element.focus !== 'function') return;
+        try {
+          element.focus({ preventScroll: true });
+        } catch (e) {
+          element.focus();
+        }
+      }
+
+      function openModal(modal, initialFocus) {
+        if (!modal) return;
+        lastFocusedElement = document.activeElement;
+        if (activeModal && activeModal !== modal) closeModal(activeModal, false);
+        activeModal = modal;
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        focusWithoutJump(initialFocus || modal.querySelector('button, input, [tabindex="0"]'));
+      }
+
+      function closeModal(modal, restoreFocus = true) {
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+        if (activeModal === modal) activeModal = null;
+        if (!activeModal) document.body.classList.remove('modal-open');
+        if (restoreFocus && lastFocusedElement && document.contains(lastFocusedElement)) {
+          focusWithoutJump(lastFocusedElement);
+          lastFocusedElement = null;
+        }
+      }
 
       // 1. Toggle Haven Monitoring
       toggleRestBtn.addEventListener('click', () => {
@@ -939,6 +1172,11 @@
       // Natural breathing oscillation when idle
       setInterval(() => {
         if (!isGuarding) return;
+        if (prefersReducedMotion()) {
+          currentDb += (targetDb - currentDb) * 0.2;
+          heroDb.textContent = currentDb.toFixed(1);
+          return;
+        }
         if (Date.now() - lastTelemetryReceivedTime > 2500) {
           targetDb = 33.8 + Math.random() * 1.4;
           const pattern = [8, 14, 22, 14, 28, 16, 10, 20, 8];
@@ -980,7 +1218,7 @@
             drillShieldIcon.innerHTML = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>';
             drillShieldIcon.style.color = '#34d399';
             testSosText.textContent = 'Passed';
-            
+
             setTimeout(() => {
               countdownBanner.classList.add('hidden');
               testSosBtn.style.opacity = '1';
@@ -1038,35 +1276,70 @@
         if (isClosed) {
           vitalityContent.classList.remove('hidden');
           accordionChevron.style.transform = 'rotate(180deg)';
+          vitalityAccordionBtn.setAttribute('aria-expanded', 'true');
         } else {
           vitalityContent.classList.add('hidden');
           accordionChevron.style.transform = 'rotate(0deg)';
+          vitalityAccordionBtn.setAttribute('aria-expanded', 'false');
         }
       });
 
       // 7. PIN Row & Modal
-      pinRow.addEventListener('click', () => {
+      function openPinModal() {
         modalPinInput.value = currentPin;
-        pinModal.classList.remove('hidden');
+        openModal(pinModal, modalPinInput);
+      }
+      pinRow.addEventListener('click', openPinModal);
+      pinRow.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openPinModal();
+        }
       });
-      closePinModalBtn.addEventListener('click', () => pinModal.classList.add('hidden'));
+      closePinModalBtn.addEventListener('click', () => closeModal(pinModal));
       pinModal.addEventListener('click', (e) => {
-        if (e.target === pinModal) pinModal.classList.add('hidden');
+        if (e.target === pinModal) closeModal(pinModal);
       });
       savePinModalBtn.addEventListener('click', () => {
         const val = modalPinInput.value.trim();
         if (val.length >= 4 && val.length <= 8) {
           currentPin = val;
           pinDots.textContent = '•'.repeat(val.length);
-          pinModal.classList.add('hidden');
+          closeModal(pinModal);
           if (window.AndroidBridge && typeof window.AndroidBridge.saveQuickPin === 'function') {
             window.AndroidBridge.saveQuickPin(val);
           }
         }
       });
 
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && activeModal) {
+          closeModal(activeModal);
+          return;
+        }
+        if (event.key === 'Tab' && activeModal) {
+          const focusable = Array.from(activeModal.querySelectorAll('button:not([disabled]), input, [href], [tabindex]:not([tabindex="-1"])'));
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            focusWithoutJump(last);
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            focusWithoutJump(first);
+          }
+        }
+      });
+
       // 8. Bottom Navigation
       navTabs.forEach(tab => {
+        tab.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            tab.click();
+          }
+        });
         tab.addEventListener('click', (e) => {
           e.preventDefault();
           const target = tab.getAttribute('data-tab');
@@ -1078,9 +1351,10 @@
             if (ind) ind.classList.add('hidden');
             const icon = t.querySelector('.nav-icon');
             if (icon) icon.style.filter = 'none';
-            const lbl = t.querySelector('.nav-label');
-            if (lbl) lbl.style.fontWeight = '500';
-          });
+             const lbl = t.querySelector('.nav-label');
+             if (lbl) lbl.style.fontWeight = '500';
+             t.setAttribute('aria-selected', 'false');
+           });
 
           tab.classList.remove('text-stone-400');
           tab.classList.add('text-gold');
@@ -1088,23 +1362,28 @@
           if (activeInd) activeInd.classList.remove('hidden');
           const activeIcon = tab.querySelector('.nav-icon');
           if (activeIcon) activeIcon.style.filter = 'drop-shadow(0 0 8px rgba(245,227,190,0.55))';
-          const activeLbl = tab.querySelector('.nav-label');
-          if (activeLbl) activeLbl.style.fontWeight = '700';
+           const activeLbl = tab.querySelector('.nav-label');
+           if (activeLbl) activeLbl.style.fontWeight = '700';
+           tab.setAttribute('aria-selected', 'true');
 
-          // Switch views
-          tabHaven.classList.add('hidden');
-          tabAudio.classList.add('hidden');
-          tabCircle.classList.add('hidden');
-          tabSettings.classList.add('hidden');
+           // Switch views
+           const panels = [tabHaven, tabAudio, tabCircle, tabSettings];
+           panels.forEach(panel => {
+             panel.classList.add('hidden');
+             panel.setAttribute('aria-hidden', 'true');
+           });
 
-          if (target === 'haven') tabHaven.classList.remove('hidden');
-          else if (target === 'audio') tabAudio.classList.remove('hidden');
-          else if (target === 'circle') tabCircle.classList.remove('hidden');
-          else if (target === 'settings') tabSettings.classList.remove('hidden');
-          
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-      });
+           const targetPanel = target === 'haven' ? tabHaven
+             : target === 'audio' ? tabAudio
+             : target === 'circle' ? tabCircle
+             : target === 'settings' ? tabSettings
+             : tabHaven;
+           targetPanel.classList.remove('hidden');
+            targetPanel.setAttribute('aria-hidden', 'false');
+
+           window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+         });
+       });
 
       // 9. Safe Sample Recording
       recordSafeSampleBtn.addEventListener('click', () => {
@@ -1128,7 +1407,90 @@
         }
       };
 
-      // 10. Circle Settings (Phone & HTTPS)
+      // 10. Optional owner voice profile
+      let ownerVoiceProfileState = null;
+
+      function normalizeOwnerVoiceState(state) {
+        if (typeof state === 'boolean') return { enrolled: state };
+        if (typeof state === 'string') {
+          try {
+            const parsed = JSON.parse(state);
+            return parsed && typeof parsed === 'object' ? parsed : { status: state };
+          } catch (e) {
+            return { status: state };
+          }
+        }
+        return state && typeof state === 'object' ? state : {};
+      }
+
+      function renderOwnerVoiceProfile(state) {
+        const profile = normalizeOwnerVoiceState(state);
+        const status = String(profile.status || '').toLowerCase();
+        const enrolling = profile.enrolling === true || profile.isEnrolling === true || profile.inProgress === true || ['enrolling', 'recording', 'pending', 'processing'].includes(status);
+        const enrolled = !enrolling && (profile.enrolled === true || profile.isEnrolled === true || profile.hasProfile === true || profile.active === true || ['enrolled', 'active', 'ready'].includes(status));
+         const modelUnavailable = profile.modelAvailable === false;
+         const hasError = status === 'error' || status === 'failed' || Boolean(profile.error) || modelUnavailable;
+        const rawSamples = profile.sampleCount ?? profile.samplesRecorded ?? profile.samples;
+        const sampleCount = Number.isFinite(Number(rawSamples)) ? Number(rawSamples) : null;
+
+        ownerVoiceActionBtn.disabled = enrolling;
+        clearOwnerVoiceBtn.classList.toggle('hidden', !enrolled || enrolling);
+
+        if (enrolling) {
+          ownerVoiceStatePill.textContent = 'Recording';
+          ownerVoiceStatusLabel.textContent = 'Enrollment in progress';
+          ownerVoiceStatusMeta.textContent = 'Complete the short sample on this device';
+          ownerVoiceActionText.textContent = 'Enrollment in progress…';
+          ownerVoiceStatus.style.color = 'var(--gold-dim)';
+          ownerVoiceStatus.textContent = 'Listening locally for your owner voice sample.';
+        } else if (enrolled) {
+          ownerVoiceStatePill.textContent = 'Ready';
+          ownerVoiceStatusLabel.textContent = 'Owner voice profile ready';
+          ownerVoiceStatusMeta.textContent = sampleCount === null ? 'Signature stored locally on this device' : `${sampleCount} local sample${sampleCount === 1 ? '' : 's'} recorded`;
+          ownerVoiceActionText.textContent = 'Update Owner Voice Profile';
+          ownerVoiceStatus.style.color = 'var(--emerald)';
+          ownerVoiceStatus.textContent = 'Voice features remain on this device.';
+        } else {
+          ownerVoiceStatePill.textContent = hasError ? 'Needs attention' : 'Not set';
+          ownerVoiceStatusLabel.textContent = hasError ? 'Owner voice profile unavailable' : 'No profile enrolled';
+           ownerVoiceStatusMeta.textContent = modelUnavailable ? 'Optional embedding model is not provisioned' : (hasError ? 'Try enrollment again when ready' : 'Ready for an on-device enrollment');
+          ownerVoiceActionText.textContent = 'Start Owner Voice Enrollment';
+          ownerVoiceStatus.style.color = hasError ? 'var(--ruby)' : 'var(--text-tertiary)';
+           ownerVoiceStatus.textContent = modelUnavailable ? 'Owner voice matching is disabled until an approved on-device embedding model is installed.' : (hasError ? String(profile.error || 'The voice profile could not be loaded.') : 'Voice features remain on this device.');
+        }
+      };
+
+      window.updateOwnerVoiceProfile = function(state) {
+        ownerVoiceProfileState = normalizeOwnerVoiceState(state);
+        renderOwnerVoiceProfile(ownerVoiceProfileState);
+      };
+
+      ownerVoiceActionBtn.addEventListener('click', () => {
+        if (window.AndroidBridge && typeof window.AndroidBridge.startOwnerVoiceEnrollment === 'function') {
+          window.AndroidBridge.startOwnerVoiceEnrollment();
+          ownerVoiceProfileState = Object.assign({}, ownerVoiceProfileState || {}, { enrolling: true, status: 'enrolling' });
+          renderOwnerVoiceProfile(ownerVoiceProfileState);
+        } else {
+          ownerVoiceStatus.style.color = 'var(--text-secondary)';
+          ownerVoiceStatus.textContent = 'Owner voice enrollment is unavailable on this device.';
+        }
+      });
+
+      clearOwnerVoiceBtn.addEventListener('click', () => {
+        if (window.AndroidBridge && typeof window.AndroidBridge.clearOwnerVoiceProfile === 'function') {
+          window.AndroidBridge.clearOwnerVoiceProfile();
+          ownerVoiceProfileState = { enrolled: false, status: 'cleared' };
+          renderOwnerVoiceProfile(ownerVoiceProfileState);
+          ownerVoiceStatus.textContent = 'Owner voice profile cleared from this device.';
+        } else {
+          ownerVoiceStatus.style.color = 'var(--text-secondary)';
+          ownerVoiceStatus.textContent = 'Clearing the owner voice profile is unavailable on this device.';
+        }
+      });
+
+      renderOwnerVoiceProfile(null);
+
+      // 11. Circle Settings (Phone & HTTPS)
       saveCircleBtn.addEventListener('click', () => {
         const phone = circlePhoneInput.value.trim();
         const endpoint = circleEndpointInput.value.trim();
@@ -1139,7 +1501,7 @@
         }
       });
 
-      // 11. Settings Tab actions
+      // 12. Settings Tab actions
       btnReqOverlay.addEventListener('click', () => {
         if (window.AndroidBridge && typeof window.AndroidBridge.requestOverlay === 'function') {
           window.AndroidBridge.requestOverlay();
@@ -1162,17 +1524,21 @@
         }
       });
 
-      // 12. Modals
-      viewRefBtn.addEventListener('click', () => refModal.classList.remove('hidden'));
-      closeRefBtn.addEventListener('click', () => refModal.classList.add('hidden'));
-      fingerprintBtn.addEventListener('click', () => {
-        pinModal.classList.remove('hidden');
+      // 13. Modals
+      viewRefBtn.addEventListener('click', () => openModal(refModal, closeRefBtn));
+      closeRefBtn.addEventListener('click', () => closeModal(refModal));
+      fingerprintBtn.addEventListener('click', openPinModal);
+      fingerprintBtn.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openPinModal();
+        }
       });
       refModal.addEventListener('click', (e) => {
-        if (e.target === refModal) refModal.classList.add('hidden');
+        if (e.target === refModal) closeModal(refModal);
       });
 
-      // 13. State Synchronization from Android
+      // 14. State Synchronization from Android
       window.initFromNative = function(state) {
         if (!state) return;
         if (typeof state.isMonitoring === 'boolean') setGuardingState(state.isMonitoring);
@@ -1193,6 +1559,9 @@
         if (state.httpsEndpoint) circleEndpointInput.value = state.httpsEndpoint;
         if (typeof state.safeSamplesCount === 'number') {
           window.updateCalibration(state.safeSamplesCount, 0);
+        }
+        if (state.ownerVoiceProfile !== undefined) {
+          window.updateOwnerVoiceProfile(state.ownerVoiceProfile);
         }
         if (state.keyVersion) {
           keyVersionText.textContent = `Key Version ${state.keyVersion} (StrongBox / Keystore)`;

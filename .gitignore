@@ -9,6 +9,7 @@ captures/
 .cxx/
 .kotlin/
 app/src/main/assets/distress_multilingual.tflite
+app/src/main/assets/owner_voice_embedding.tflite
 __pycache__/
 *.pyc
 *.apk

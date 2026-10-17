@@ -58,6 +58,37 @@ model is present. The debug fallback intentionally returns a synthetic strong
 distress result for the rapid one-window path; it is not a speech recognizer and
 must not be used to evaluate false-positive performance.
 
+### Reasoning layer and owner voice profile
+
+`DistressReasoningEngine` is a conservative, language-aware decision layer over
+the acoustic model and Tier 1 sensors. It maps exact model labels into typed
+events instead of relying on substring matches, and gives protected precedence
+to duress, explicit distress phrases, impact plus concurrent motion, and strong
+non-verbal distress. An owner-voice match can suppress only a calibrated benign
+speech event; it can never veto a scream, explicit distress phrase, impact with
+motion, or duress path.
+
+The optional owner voice feature is an enrollment/matching boundary, not a claim
+that a phone can achieve negligible false alerts. An approved
+`owner_voice_embedding.tflite` asset is required for enrollment. The adapter
+accepts a bounded PCM input and returns an embedding; the app stores only
+encrypted, normalized embeddings and scalar statistics in Android Keystore-
+protected storage. It never stores enrollment audio. If the model asset is
+missing, malformed, or unable to produce an embedding, owner suppression is
+disabled and distress detection remains fail-closed.
+
+The taxonomy includes native-script and transliterated aliases for Hindi,
+Bengali, Tamil, Telugu, Kannada, Malayalam, Marathi, Gujarati, Punjabi, and
+Urdu. This is label/policy coverage, not a substitute for training and
+evaluating a multilingual speech/event model. Add or change labels only with
+consented representative data, per-language false-accept/false-reject
+measurements, and a signed model review.
+
+The Audio tab exposes the optional **Owner Voice Profile** enrollment state. A
+short user-initiated sample is processed locally, and the UI clearly reports
+when the optional embedding asset is not provisioned. Clearing the profile
+removes the encrypted local profile from the device.
+
 ## Tier 1 physiological DSP
 
 `TierOneAnalyzer.kt` adds three pure-Kotlin detectors without persisting raw

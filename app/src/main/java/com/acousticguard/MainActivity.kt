@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     private var permissionIndex = 0
     private var telemetryReceiverRegistered = false
     private var isMonitoringActive = false
+    private var pendingOwnerVoiceEnrollment = false
 
     private val telemetryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -50,6 +51,22 @@ class MainActivity : Activity() {
                         if (stage.isNotEmpty()) {
                             webView.evaluateJavascript("if(window.updatePipelineStage) window.updatePipelineStage(${JSONObject.quote(stage)});", null)
                         }
+                    }
+                }
+                AcousticCaptureService.ACTION_OWNER_VOICE_STATUS -> {
+                    val state = JSONObject().apply {
+                        put("status", intent.getStringExtra(AcousticCaptureService.EXTRA_OWNER_VOICE_STATUS).orEmpty())
+                        put("enrolled", intent.getBooleanExtra(AcousticCaptureService.EXTRA_OWNER_VOICE_ENROLLED, false))
+                        put("sampleCount", intent.getIntExtra(AcousticCaptureService.EXTRA_OWNER_VOICE_SAMPLE_COUNT, 0))
+                        put("remaining", intent.getIntExtra(AcousticCaptureService.EXTRA_OWNER_VOICE_REMAINING, 0))
+                        put("modelAvailable", intent.getBooleanExtra(AcousticCaptureService.EXTRA_OWNER_VOICE_MODEL_AVAILABLE, false))
+                        intent.getStringExtra(AcousticCaptureService.EXTRA_OWNER_VOICE_ERROR)?.let { put("error", it) }
+                    }
+                    webView.post {
+                        webView.evaluateJavascript(
+                            "if(window.updateOwnerVoiceProfile) window.updateOwnerVoiceProfile($state);",
+                            null
+                        )
                     }
                 }
             }
@@ -124,6 +141,7 @@ class MainActivity : Activity() {
         if (telemetryReceiverRegistered) return
         val filter = IntentFilter(AcousticCaptureService.ACTION_AUDIO_TELEMETRY).apply {
             addAction(AcousticCaptureService.ACTION_CALIBRATION_STATUS)
+            addAction(AcousticCaptureService.ACTION_OWNER_VOICE_STATUS)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(telemetryReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -170,9 +188,20 @@ class MainActivity : Activity() {
                 "nativeAudioStatus",
                 if (BuildConfig.NATIVE_AUDIO_ENABLED) NativeAudioBoundary.status().detail else "AudioRecord 16kHz"
             )
+            val ownerVoice = EncryptedOwnerVoiceProfileStore(this@MainActivity).status()
+            put("ownerVoiceProfile", JSONObject().apply {
+                put("status", if (ownerVoice.enrolled) "enrolled" else "idle")
+                put("enrolled", ownerVoice.enrolled)
+                put("sampleCount", ownerVoice.sampleCount)
+                put("modelAvailable", ownerVoiceModelAvailable())
+            })
         }
         return state.toString()
     }
+
+    private fun ownerVoiceModelAvailable(): Boolean = runCatching {
+        assets.open(TfliteVoiceEmbeddingModel.DEFAULT_ASSET_NAME).use { true }
+    }.getOrDefault(false)
 
     private fun beginPermissionFlow() {
         permissionIndex = 0
@@ -206,6 +235,23 @@ class MainActivity : Activity() {
     private fun startMonitoring() {
         WatchdogService.start(this)
         val intent = Intent(this, AcousticCaptureService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        isMonitoringActive = true
+        syncInitialStateToWeb()
+        if (pendingOwnerVoiceEnrollment) {
+            pendingOwnerVoiceEnrollment = false
+            startOwnerVoiceEnrollmentService()
+        }
+    }
+
+    private fun startOwnerVoiceEnrollmentService() {
+        val intent = Intent(this, AcousticCaptureService::class.java).apply {
+            action = AcousticCaptureService.ACTION_START_OWNER_VOICE_ENROLLMENT
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
@@ -328,6 +374,33 @@ class MainActivity : Activity() {
                 } else {
                     startService(intent)
                 }
+            }
+        }
+
+        @JavascriptInterface
+        fun startOwnerVoiceEnrollment() {
+            runOnUiThread {
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    pendingOwnerVoiceEnrollment = true
+                    beginPermissionFlow()
+                } else {
+                    startOwnerVoiceEnrollmentService()
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun clearOwnerVoiceProfile() {
+            runOnUiThread {
+                EncryptedOwnerVoiceProfileStore(this@MainActivity).clear()
+                if (isMonitoringActive) {
+                    startService(
+                        Intent(this@MainActivity, AcousticCaptureService::class.java).apply {
+                            action = AcousticCaptureService.ACTION_CLEAR_OWNER_VOICE_PROFILE
+                        }
+                    )
+                }
+                syncInitialStateToWeb()
             }
         }
 

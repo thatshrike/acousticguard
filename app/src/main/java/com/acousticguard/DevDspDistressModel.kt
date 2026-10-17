@@ -206,7 +206,8 @@ class DevDspDistressModel : DistressModel {
             keywordConfidence = 0f,
             combinedConfidence = distressConfidence, // combinedConfidence = 0.96f
             matchedLabels = matched,
-            strongDistressLabel = isStrongDistress
+            strongDistressLabel = isStrongDistress,
+            benignSpeechConfidence = pSpeech
         )
     }
 
