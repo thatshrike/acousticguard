@@ -40,6 +40,9 @@ class AcousticCaptureService : Service() {
     private var pipeline: DistressDetectionPipeline? = null
     private var captureThread: Thread? = null
     private var lastInferenceAt = 0L
+    private var lastRapidProbeAt = 0L
+    private var candidateGeneration = 0L
+    private var candidateActive = false
     private var modelError: String? = null
     private var nativeCaptureActive = false
     private val nativeFrame = ShortArray(FRAME_SAMPLES)
@@ -122,10 +125,22 @@ class AcousticCaptureService : Service() {
                     FalsePositiveLogger(this).recordFalsePositive(listOf("quiet_cancel", eventId))
                 }
                 preAlertInFlight.set(false)
+                pipeline?.reset()
+                lastInferenceAt = 0L
+                lastRapidProbeAt = 0L
+                candidateActive = false
+                candidateGeneration++
                 getSystemService(NotificationManager::class.java).cancel(ALERT_NOTIFICATION_ID)
                 return START_STICKY
             }
-            ACTION_PRE_ALERT_RESOLVED -> preAlertInFlight.set(false)
+            ACTION_PRE_ALERT_RESOLVED -> {
+                preAlertInFlight.set(false)
+                pipeline?.reset()
+                lastInferenceAt = 0L
+                lastRapidProbeAt = 0L
+                candidateActive = false
+                candidateGeneration++
+            }
         }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             stopSelf()
@@ -283,18 +298,67 @@ class AcousticCaptureService : Service() {
         if (!features.candidate) {
             model.reset()
             lastInferenceAt = 0L
+            lastRapidProbeAt = 0L
+            candidateActive = false
+            candidateGeneration++
             return
         }
-        if (audioBuffer.sizeBytes() < BUFFER_BYTES) return
-        if (now - lastInferenceAt < EVALUATION_WINDOW_MS) return
-        lastInferenceAt = now
+        if (!candidateActive) {
+            candidateActive = true
+            candidateGeneration++
+        }
+
+        val voiceLike = features.reasons.any {
+            it == TierOneReason.RMS_ZCR ||
+                it == TierOneReason.HIGH_FREQUENCY ||
+                it == TierOneReason.RESPIRATORY_PERIODICITY
+        }
+        val strongMotionCandidate = features.impact.detected &&
+            features.motionConcurrent &&
+            features.accelerationPeak >= RapidEscalationPolicy.MIN_ACCELERATION_PEAK &&
+            features.gyroscopePeak >= RapidEscalationPolicy.MIN_GYROSCOPE_PEAK
+        val rapidDue = (voiceLike || strongMotionCandidate) &&
+            now - lastRapidProbeAt >= RAPID_PROBE_INTERVAL_MS
+        val standardReady = audioBuffer.sizeBytes() >= BUFFER_BYTES
+        val standardCadence = if (features.fastTrack) EVALUATION_WINDOW_MS / 2L else EVALUATION_WINDOW_MS
+        val standardDue = standardReady && now - lastInferenceAt >= standardCadence
+        if (!rapidDue && !standardDue) return
+
         val snapshot = audioBuffer.snapshotPcm16()
+        val generation = candidateGeneration
+        if (rapidDue) {
+            lastRapidProbeAt = now
+            sendPipelineTelemetry(STAGE_RAPID_PROBE)
+            inferenceExecutor.execute {
+                val result = model.evaluateRapid(snapshot, features, nowElapsedMs = now)
+                if (result.validated && generation == candidateGeneration && preAlertInFlight.compareAndSet(false, true)) {
+                    mainHandler.post {
+                        sendPipelineTelemetry(STAGE_RAPID_VALIDATED)
+                        launchPreAlert(result.scores?.matchedLabels.orEmpty())
+                    }
+                }
+            }
+            return
+        }
+
+        lastInferenceAt = now
+        sendPipelineTelemetry(STAGE_STANDARD_INFERENCE)
         inferenceExecutor.execute {
             val result = model.evaluate(snapshot, features, nowElapsedMs = now)
-            if (result.validated && preAlertInFlight.compareAndSet(false, true)) {
-                mainHandler.post { launchPreAlert(result.scores?.matchedLabels.orEmpty()) }
+            if (result.validated && generation == candidateGeneration && preAlertInFlight.compareAndSet(false, true)) {
+                mainHandler.post {
+                    sendPipelineTelemetry(STAGE_STANDARD_VALIDATED)
+                    launchPreAlert(result.scores?.matchedLabels.orEmpty())
+                }
             }
         }
+    }
+
+    private fun sendPipelineTelemetry(stage: String) {
+        sendBroadcast(Intent(ACTION_AUDIO_TELEMETRY).apply {
+            setPackage(packageName)
+            putExtra(EXTRA_PIPELINE_STAGE, stage)
+        })
     }
 
     private fun sendAudioTelemetry(features: TierOneFeatures) {
@@ -367,7 +431,15 @@ class AcousticCaptureService : Service() {
         val eventId = UUID.randomUUID().toString()
         if (!ExactAlarmScheduler.schedule(this, eventId, labels.toTypedArray(), delayMs = 5_000L)) {
             preAlertInFlight.set(false)
-            reportCaptureFailure("Quiet alert requires exact-alarm access; no dispatch was scheduled")
+            val intent = Intent(this, GracePeriodActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                putExtra(GracePeriodActivity.EXTRA_MATCHED_LABELS, labels.toTypedArray())
+            }
+            getSystemService(NotificationManager::class.java).notify(
+                ALERT_NOTIFICATION_ID,
+                alertNotification(intent, "Exact-alarm access unavailable; tap to review the alert")
+            )
+            reportCaptureFailure("Quiet alert requires exact-alarm access; visible fallback notification posted")
             return
         }
         FalsePositiveLogger(this).recordDispatchScheduled(eventId, labels)
@@ -476,11 +548,14 @@ class AcousticCaptureService : Service() {
             )
             .build()
 
-    private fun alertNotification(activityIntent: Intent) =
+    private fun alertNotification(
+        activityIntent: Intent,
+        message: String = "Tap to review or cancel the 10-second SOS countdown"
+    ) =
         Notification.Builder(this, ALERT_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("Possible distress detected")
-            .setContentText("Tap to review or cancel the 10-second SOS countdown")
+            .setContentText(message)
             .setPriority(Notification.PRIORITY_MAX)
             .setCategory(Notification.CATEGORY_ALARM)
             .setAutoCancel(true)
@@ -529,6 +604,7 @@ class AcousticCaptureService : Service() {
         const val EXTRA_RMS_DB = "rms_db"
         const val EXTRA_CANDIDATE_FLAG = "candidate_flag"
         const val EXTRA_FAST_TRACK = "fast_track"
+        const val EXTRA_PIPELINE_STAGE = "pipeline_stage"
         const val ACTION_SIMULATE_ALERT = "com.acousticguard.action.SIMULATE_ALERT"
         const val ACTION_DURESS_DISPATCH = "com.acousticguard.action.DURESS_DISPATCH"
         const val EXTRA_DURESS_LABELS = "duress_labels"
@@ -547,9 +623,14 @@ class AcousticCaptureService : Service() {
         private const val BUFFER_BYTES = 112_000 // 16,000 mono PCM16 samples × 3.5 seconds
         private const val FRAME_SAMPLES = CAPTURE_RATE / 2
         private const val EVALUATION_WINDOW_MS = 1_500L
+        private const val RAPID_PROBE_INTERVAL_MS = 750L
         private const val RESTART_DELAY_MS = 2_000L
         private const val CALIBRATION_FRAME_COUNT = 6
         private const val SENSOR_CONFIDENCE_BOOST = 0.15f
+        const val STAGE_RAPID_PROBE = "rapid_probe"
+        const val STAGE_RAPID_VALIDATED = "rapid_validated"
+        const val STAGE_STANDARD_INFERENCE = "standard_inference"
+        const val STAGE_STANDARD_VALIDATED = "standard_validated"
         private val SUPPORTED_CAPTURE_RATES = intArrayOf(16_000, 48_000, 44_100)
     }
 }

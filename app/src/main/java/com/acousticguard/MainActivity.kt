@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -43,8 +44,12 @@ class MainActivity : Activity() {
                     val db = intent.getIntExtra(AcousticCaptureService.EXTRA_RMS_DB, -100)
                     val candidate = intent.getBooleanExtra(AcousticCaptureService.EXTRA_CANDIDATE_FLAG, false)
                     val fastTrack = intent.getBooleanExtra(AcousticCaptureService.EXTRA_FAST_TRACK, false)
+                    val stage = intent.getStringExtra(AcousticCaptureService.EXTRA_PIPELINE_STAGE).orEmpty()
                     webView.post {
                         webView.evaluateJavascript("window.updateTelemetry($db, $candidate, $fastTrack);", null)
+                        if (stage.isNotEmpty()) {
+                            webView.evaluateJavascript("if(window.updatePipelineStage) window.updatePipelineStage(${JSONObject.quote(stage)});", null)
+                        }
                     }
                 }
             }
@@ -77,14 +82,17 @@ class MainActivity : Activity() {
         dispatch = DispatchPreferences(this)
 
         webView = WebView(this).apply {
-            setBackgroundColor(0xFF0C0E13.toInt())
+            setBackgroundColor(0xFF08090D.toInt())
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 allowFileAccess = true
                 cacheMode = WebSettings.LOAD_DEFAULT
-                useWideViewPort = true
-                loadWithOverviewMode = true
+                useWideViewPort = false
+                loadWithOverviewMode = false
             }
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -99,7 +107,7 @@ class MainActivity : Activity() {
 
         // Attached main activity layout with scroll frame container
         val scroll = FrameLayout(this).apply {
-            setBackgroundColor(0xFF0C0E13.toInt())
+            setBackgroundColor(0xFF08090D.toInt())
             addView(
                 webView,
                 FrameLayout.LayoutParams(

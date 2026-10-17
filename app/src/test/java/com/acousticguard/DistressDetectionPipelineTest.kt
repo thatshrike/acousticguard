@@ -55,4 +55,35 @@ class DistressDetectionPipelineTest {
         assertTrue(pipeline.evaluate(audio, features, 1_500L).validated)
         pipeline.close()
     }
+
+    @Test
+    fun rapidProbeDoesNotConsumeTheOrdinaryTwoWindowConfirmationCounter() {
+        val model = object : DistressModel {
+            override fun infer(pcm16: ShortArray) = ModelScores(
+                distressConfidence = 0.95f,
+                keywordConfidence = 0.95f,
+                combinedConfidence = 0.95f,
+                matchedLabels = listOf("help"),
+                explicitHelpKeyword = true
+            )
+
+            override fun close() = Unit
+        }
+        val pipeline = DistressDetectionPipeline(model)
+        val features = TierOneFeatures(
+            audio = AudioFeatures(0.2f, 0.2f, 0.4f, 0.03f, 0.08f, true),
+            spectral = SpectralFeatures(0.5f, true, 1f),
+            respiratory = RespiratoryFeatures(null, null, 0f, false),
+            impact = ImpactFeatures(false, 0f, 0f, 0f, null, null, false),
+            candidate = true,
+            reasons = setOf(TierOneReason.HIGH_FREQUENCY)
+        )
+        val rapid = pipeline.evaluateRapid(ShortArray(8_000), features, 1_000L)
+        assertTrue(rapid.validated)
+
+        val standard = pipeline.evaluate(ShortArray(56_000), features, 1_500L)
+        assertFalse(standard.validated)
+        assertTrue(standard.consecutiveQualifyingWindows == 1)
+        pipeline.close()
+    }
 }

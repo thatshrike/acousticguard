@@ -13,6 +13,10 @@ class MotionFusion(context: Context) : SensorEventListener {
     private val gyroscope = sensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
     @Volatile private var accelerationSpike = 0f
     @Volatile private var gyroscopeSpike = 0f
+    private var accelerationPeak = 0f
+    private var gyroscopePeak = 0f
+    private var accelerationAtMs = 0L
+    private var gyroscopeAtMs = 0L
 
     fun start(): Boolean {
         val manager = sensorManager ?: return false
@@ -30,12 +34,42 @@ class MotionFusion(context: Context) : SensorEventListener {
         sensorManager?.unregisterListener(this)
         accelerationSpike = 0f
         gyroscopeSpike = 0f
+        synchronized(this) {
+            accelerationPeak = 0f
+            gyroscopePeak = 0f
+            accelerationAtMs = 0L
+            gyroscopeAtMs = 0L
+        }
     }
 
     fun enrich(features: TierOneFeatures): TierOneFeatures {
-        val motionScore = (0.65f * accelerationSpike + 0.35f * gyroscopeSpike).coerceIn(0f, 1f)
+        val now = android.os.SystemClock.elapsedRealtime()
+        val evidence = synchronized(this) {
+            val value = MotionEvidence(
+                accelerationPeak,
+                gyroscopePeak,
+                accelerationAtMs,
+                gyroscopeAtMs
+            )
+            accelerationPeak = 0f
+            gyroscopePeak = 0f
+            accelerationAtMs = 0L
+            gyroscopeAtMs = 0L
+            value
+        }
+        val motionScore = (0.65f * evidence.accelerationPeak + 0.35f * evidence.gyroscopePeak)
+            .coerceIn(0f, 1f)
+        val concurrent = evidence.accelerationPeak > 0f && evidence.gyroscopePeak > 0f &&
+            kotlin.math.abs(evidence.accelerationAtMs - evidence.gyroscopeAtMs) <= CONCURRENCY_WINDOW_MS &&
+            now - maxOf(evidence.accelerationAtMs, evidence.gyroscopeAtMs) <= EVIDENCE_MAX_AGE_MS
         val boost = if (TierOneReason.IMPACT_TRANSIENT in features.reasons) motionScore else 0f
-        return features.copy(motionShockScore = motionScore, sensorFusionBoost = boost)
+        return features.copy(
+            motionShockScore = motionScore,
+            sensorFusionBoost = boost,
+            accelerationPeak = evidence.accelerationPeak,
+            gyroscopePeak = evidence.gyroscopePeak,
+            motionConcurrent = concurrent
+        )
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -47,11 +81,19 @@ class MotionFusion(context: Context) : SensorEventListener {
                 val spike = ((kotlin.math.abs(magnitude - SensorManager.GRAVITY_EARTH) - 1.5f) / 8f)
                     .coerceIn(0f, 1f)
                 accelerationSpike = maxOf(spike, accelerationSpike * 0.92f)
+                if (spike > 0f) synchronized(this) {
+                    accelerationPeak = maxOf(accelerationPeak, spike)
+                    accelerationAtMs = android.os.SystemClock.elapsedRealtime()
+                }
             }
             Sensor.TYPE_GYROSCOPE -> {
                 val magnitude = magnitude(event.values)
                 val spike = ((magnitude - 1.5f) / 6f).coerceIn(0f, 1f)
                 gyroscopeSpike = maxOf(spike, gyroscopeSpike * 0.92f)
+                if (spike > 0f) synchronized(this) {
+                    gyroscopePeak = maxOf(gyroscopePeak, spike)
+                    gyroscopeAtMs = android.os.SystemClock.elapsedRealtime()
+                }
             }
         }
     }
@@ -60,4 +102,16 @@ class MotionFusion(context: Context) : SensorEventListener {
 
     private fun magnitude(values: FloatArray): Float =
         sqrt(values.fold(0f) { sum, value -> sum + value * value })
+
+    private data class MotionEvidence(
+        val accelerationPeak: Float,
+        val gyroscopePeak: Float,
+        val accelerationAtMs: Long,
+        val gyroscopeAtMs: Long
+    )
+
+    companion object {
+        private const val CONCURRENCY_WINDOW_MS = 350L
+        private const val EVIDENCE_MAX_AGE_MS = 750L
+    }
 }

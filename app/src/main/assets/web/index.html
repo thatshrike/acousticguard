@@ -854,6 +854,16 @@
         });
       };
 
+      window.updatePipelineStage = function(stage) {
+        const messages = {
+          rapid_probe: 'Rapid distress probe running on the latest audio window.',
+          rapid_validated: 'Rapid distress signature validated; opening alert protection.',
+          standard_inference: 'Full-context distress inference running.',
+          standard_validated: 'Full-context distress signature validated; opening alert protection.'
+        };
+        if (messages[stage] && isGuarding) heroSubtitle.textContent = messages[stage];
+      };
+
       // Natural breathing oscillation when idle or between telemetry updates
       setInterval(() => {
         if (!isGuarding) return;

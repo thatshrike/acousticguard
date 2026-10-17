@@ -54,7 +54,9 @@ used only when the model asset is absent. It treats a Tier 1 candidate as a
 development distress event so the foreground service, grace period, exact alarm,
 encrypted payload, and optional mesh can be exercised immediately. Release
 builds do not enable this fallback and remain fail-closed until the approved
-model is present.
+model is present. The debug fallback intentionally returns a synthetic strong
+distress result for the rapid one-window path; it is not a speech recognizer and
+must not be used to evaluate false-positive performance.
 
 ## Tier 1 physiological DSP
 
@@ -74,6 +76,28 @@ model confidence of at least `0.82` in two consecutive windows. Co-occurring
 spectral and respiratory evidence uses a 750 ms inference cadence so two windows
 can complete in approximately 1.5 seconds; ordinary candidates retain the
 1.5-second cadence.
+
+### Rapid escalation for a remote single shout
+
+Tier 1 telemetry is not itself an alert. The service now also runs an early model
+probe on a candidate after the first 500 ms frame, even though the 3.5-second
+pre-roll buffer is not full. Short input is zero-padded by the model adapter.
+The early probe is allowed to open the normal protection flow after one window
+only when one of these calibrated conditions is met:
+
+- an exact multilingual help label (`help`, `madad`, `मदद`, `bachao`, `बचाओ`,
+  `sahayata`, `सहायता`, etc.) reaches at least `0.90` keyword confidence and
+  the adjusted score remains at least `0.82`;
+- a voice-like candidate has an exact strong distress label at least `0.95`;
+- a valid impact is concurrent with both a strong accelerometer and gyroscope
+  event, plus an exact strong distress label at least `0.90`.
+
+The regular path remains conservative: full 3.5-second context, calibrated
+confidence, and two consecutive qualifying windows. A single Tier 1 flag,
+accelerometer event, substring label such as `helpful`, or weak model result
+cannot trigger SOS. The live UI now reports whether the service is running a
+rapid probe, full-context inference, or validated stage, which makes field tests
+diagnosable instead of showing only `Acoustic Anomaly Flagged!`.
 
 ## Optional native low-latency boundary
 

@@ -15,7 +15,11 @@ data class ModelScores(
     val distressConfidence: Float,
     val keywordConfidence: Float,
     val combinedConfidence: Float,
-    val matchedLabels: List<String>
+    val matchedLabels: List<String>,
+    /** Set only by an exact canonical help label at the rapid-probe threshold. */
+    val explicitHelpKeyword: Boolean = false,
+    /** Set only by an exact canonical distress label at the strong-event threshold. */
+    val strongDistressLabel: Boolean = false
 )
 
 data class PipelineResult(
@@ -24,7 +28,9 @@ data class PipelineResult(
     val validated: Boolean,
     val modelError: String? = null,
     val tierOneReasons: Set<TierOneReason> = emptySet(),
-    val fastTrack: Boolean = false
+    val fastTrack: Boolean = false,
+    val rawScores: ModelScores? = null,
+    val rapidReason: RapidEscalationReason? = null
 )
 
 interface DistressModel : Closeable {
@@ -94,7 +100,8 @@ class TfliteDistressModel(context: Context) : DistressModel {
         val start = max(0, pcm16.size - inputElements)
         val copied = minOf(inputElements, pcm16.size)
         repeat(inputElements) { index ->
-            val value = if (index < copied) pcm16[start + index] / 32768f else 0f
+            val sourceIndex = index - (inputElements - copied)
+            val value = if (sourceIndex >= 0) pcm16[start + sourceIndex] / 32768f else 0f
             writeInput(input, value)
         }
         input.rewind()
@@ -121,7 +128,13 @@ class TfliteDistressModel(context: Context) : DistressModel {
             distressConfidence = distress,
             keywordConfidence = keyword,
             combinedConfidence = max(distress, keyword),
-            matchedLabels = matched
+            matchedLabels = matched,
+            explicitHelpKeyword = labels.withIndex().any { (index, rawLabel) ->
+                isCanonicalHelpLabel(rawLabel) && scores[index] >= RapidEscalationPolicy.RAPID_KEYWORD_THRESHOLD
+            },
+            strongDistressLabel = labels.withIndex().any { (index, rawLabel) ->
+                isCanonicalDistressLabel(rawLabel) && scores[index] >= RapidEscalationPolicy.STRONG_DISTRESS_THRESHOLD
+            }
         )
     }
 
@@ -168,8 +181,19 @@ class TfliteDistressModel(context: Context) : DistressModel {
         }
     }
 
+    private fun isCanonicalHelpLabel(rawLabel: String): Boolean =
+        HELP_TERMS.contains(rawLabel.trim().lowercase(Locale.ROOT))
+
+    private fun isCanonicalDistressLabel(rawLabel: String): Boolean =
+        STRONG_DISTRESS_TERMS.contains(rawLabel.trim().lowercase(Locale.ROOT))
+
     companion object {
         private val DISTRESS_TERMS = setOf(
+            "distress", "scream", "cry", "sob", "hyperventilation", "struggle", "panic",
+            "screaming_vocal_friction", "hyperventilation_gasp", "physical_struggle_thud",
+            "physical_restraint_groan", "suffocation_stridor"
+        )
+        private val STRONG_DISTRESS_TERMS = setOf(
             "distress", "scream", "cry", "sob", "hyperventilation", "struggle", "panic",
             "screaming_vocal_friction", "hyperventilation_gasp", "physical_struggle_thud",
             "physical_restraint_groan", "suffocation_stridor"
@@ -214,6 +238,38 @@ class DistressDetectionPipeline(
         return evaluateInternal(pcm16, tierOne.candidate, nowElapsedMs, tierOne.fastTrack, tierOne.reasons, tierOne)
     }
 
+    @Synchronized
+    fun evaluateRapid(
+        pcm16: ShortArray,
+        tierOne: TierOneFeatures,
+        nowElapsedMs: Long = SystemClock.elapsedRealtime()
+    ): PipelineResult {
+        if (!tierOne.candidate) return PipelineResult(null, 0, false, tierOneReasons = tierOne.reasons)
+        return try {
+            val rawScores = model.infer(pcm16)
+            val adjustedScores = scoreAdjuster(rawScores, tierOne)
+            val decision = RapidEscalationPolicy.decide(tierOne, rawScores, adjustedScores)
+            PipelineResult(
+                scores = adjustedScores,
+                consecutiveQualifyingWindows = consecutiveQualifying,
+                validated = decision.shouldPreAlert,
+                tierOneReasons = tierOne.reasons,
+                fastTrack = tierOne.fastTrack,
+                rawScores = rawScores,
+                rapidReason = decision.reason
+            )
+        } catch (error: Exception) {
+            PipelineResult(
+                scores = null,
+                consecutiveQualifyingWindows = consecutiveQualifying,
+                validated = false,
+                modelError = error.message ?: error.javaClass.simpleName,
+                tierOneReasons = tierOne.reasons,
+                fastTrack = tierOne.fastTrack
+            )
+        }
+    }
+
     private fun evaluateInternal(
         pcm16: ShortArray,
         tierOneAnomalous: Boolean,
@@ -234,14 +290,22 @@ class DistressDetectionPipeline(
         lastEvaluationAt = nowElapsedMs
 
         return try {
-            val scores = scoreAdjuster(model.infer(pcm16), tierOne)
+            val rawScores = model.infer(pcm16)
+            val scores = scoreAdjuster(rawScores, tierOne)
             if (scores.combinedConfidence >= confidenceThreshold) {
                 consecutiveQualifying++
             } else {
                 consecutiveQualifying = 0
             }
             validated = consecutiveQualifying >= requiredWindows
-            PipelineResult(scores, consecutiveQualifying, validated, tierOneReasons = reasons, fastTrack = fastTrack)
+            PipelineResult(
+                scores = scores,
+                consecutiveQualifyingWindows = consecutiveQualifying,
+                validated = validated,
+                tierOneReasons = reasons,
+                fastTrack = fastTrack,
+                rawScores = rawScores
+            )
         } catch (error: Exception) {
             consecutiveQualifying = 0
             validated = false
@@ -251,7 +315,8 @@ class DistressDetectionPipeline(
                 false,
                 error.message ?: error.javaClass.simpleName,
                 reasons,
-                fastTrack
+                fastTrack,
+                rawScores = null
             )
         }
     }

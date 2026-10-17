@@ -45,7 +45,10 @@ data class TierOneFeatures(
     val candidate: Boolean,
     val reasons: Set<TierOneReason>,
     val motionShockScore: Float = 0f,
-    val sensorFusionBoost: Float = 0f
+    val sensorFusionBoost: Float = 0f,
+    val accelerationPeak: Float = 0f,
+    val gyroscopePeak: Float = 0f,
+    val motionConcurrent: Boolean = false
 ) {
     val fastTrack: Boolean
         get() = spectral.valid && respiratory.valid &&
