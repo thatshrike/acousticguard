@@ -1,11 +1,11 @@
 background
 speech
+screaming_vocal_friction
+hyperventilation_gasp
+physical_struggle_thud
+physical_restraint_groan
+suffocation_stridor
 distress
-scream
-cry
-hyperventilation
-struggle
-panic
 help
 help me
 madad

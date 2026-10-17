@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.SystemClock
 
 object ExactAlarmScheduler {
     const val EXTRA_EVENT_ID = "event_id"
@@ -25,35 +26,45 @@ object ExactAlarmScheduler {
         }
     }
 
-    fun schedule(context: Context, eventId: String, labels: Array<String>): Boolean {
+    fun schedule(context: Context, eventId: String, labels: Array<String>, delayMs: Long = 1_000L): Boolean {
+        require(delayMs >= 0L) { "delayMs must be non-negative" }
         if (!canSchedule(context)) return false
+        if (!DispatchEventStore(context).markScheduled(eventId)) return false
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val intent = Intent(context, SosDispatchReceiver::class.java).apply {
             action = ACTION_DISPATCH
+            data = android.net.Uri.parse("acousticguard://sos/$eventId")
             putExtra(EXTRA_EVENT_ID, eventId)
             putExtra(EXTRA_LABELS, labels)
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            eventId.hashCode(),
+            0,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        alarmManager.setExactAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            System.currentTimeMillis() + 1_000L,
-            pendingIntent
-        )
-        return true
+        return runCatching {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                SystemClock.elapsedRealtime() + delayMs,
+                pendingIntent
+            )
+            true
+        }.getOrElse {
+            DispatchEventStore(context).markFailed(eventId)
+            false
+        }
     }
 
     fun cancel(context: Context, eventId: String) {
+        DispatchEventStore(context).markCanceled(eventId)
         val intent = Intent(context, SosDispatchReceiver::class.java).apply {
             action = ACTION_DISPATCH
+            data = android.net.Uri.parse("acousticguard://sos/$eventId")
         }
         PendingIntent.getBroadcast(
                 context,
-                eventId.hashCode(),
+                0,
                 intent,
                 PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
             )?.let { context.getSystemService(AlarmManager::class.java).cancel(it) }

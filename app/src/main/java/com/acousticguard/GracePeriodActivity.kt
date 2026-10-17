@@ -130,7 +130,8 @@ class GracePeriodActivity : Activity() {
         resolved = true
         if (!ExactAlarmScheduler.schedule(this, eventId, labels)) {
             // No exact-alarm access means no silent fallback to an unbounded inexact alarm.
-            FalsePositiveLogger(this).recordFalsePositive(labels.toList() + "exact_alarm_unavailable")
+            // This is an unavailable dispatch path, not evidence that the model was wrong.
+            FalsePositiveLogger(this).recordDispatchUnavailable(eventId, "exact_alarm_unavailable")
             notifyServiceResolved()
             finishAndRemoveTask()
             return

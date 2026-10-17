@@ -24,6 +24,9 @@ def main() -> int:
     pipeline = read("app/src/main/java/com/acousticguard/DistressDetectionPipeline.kt")
     scheduler = read("app/src/main/java/com/acousticguard/ExactAlarmScheduler.kt")
     grace = read("app/src/main/java/com/acousticguard/GracePeriodActivity.kt")
+    dsp = read("app/src/main/java/com/acousticguard/TierOneAnalyzer.kt")
+    crypto = read("app/src/main/java/com/acousticguard/SosPayloadCrypto.kt")
+    mesh = read("app/src/main/java/com/acousticguard/CommunityMesh.kt")
     labels = [line for line in read("app/src/main/assets/distress_multilingual_labels.txt").splitlines() if line]
 
     for permission in (
@@ -36,7 +39,7 @@ def main() -> int:
         "android.permission.SCHEDULE_EXACT_ALARM",
     ):
         require(manifest, re.escape(permission), permission)
-    require(manifest, r'android:foregroundServiceType="microphone"', "microphone FGS type")
+    require(manifest, r'android:foregroundServiceType="microphone(?:\|connectedDevice)?"', "microphone FGS type")
     require(service, r"AudioRecord\.READ_BLOCKING", "blocking AudioRecord loop")
     require(service, r"CircularPcmBuffer\(BUFFER_BYTES\)", "bounded PCM buffer")
     require(service, r"CAPTURE_RATE = 16_000", "16 kHz normalized capture")
@@ -46,7 +49,17 @@ def main() -> int:
     require(scheduler, r"setExactAndAllowWhileIdle", "Doze-aware exact alarm")
     require(grace, r"COUNTDOWN_MS = 10_000L", "ten-second grace period")
     require(grace, r"recordFalsePositive", "false-positive calibration")
-    if len(labels) != 16 or not {"help", "madad", "मदद", "bachao", "बचाओ", "sahayata", "सहायता"}.issubset(labels):
+    require(dsp, r"class SpectralAnalyzer", "spectral Tier 1 detector")
+    require(dsp, r"class RespiratoryPeriodicityDetector", "respiratory Tier 1 detector")
+    require(dsp, r"class ImpactTransientDetector", "impact Tier 1 detector")
+    require(crypto, r"AES/GCM/NoPadding", "authenticated SOS encryption")
+    require(mesh, r"BluetoothLeAdvertiser", "BLE advertiser")
+    require(mesh, r"BluetoothLeScanner", "BLE scanner")
+    if len(labels) != 16 or not {
+        "screaming_vocal_friction", "hyperventilation_gasp", "physical_struggle_thud",
+        "physical_restraint_groan", "suffocation_stridor", "help", "madad", "मदद",
+        "bachao", "बचाओ", "sahayata", "सहायता"
+    }.issubset(labels):
         raise AssertionError("multilingual distress label contract is incomplete")
 
     print("AcousticGuard offline validation: PASS")

@@ -16,6 +16,10 @@ class FalsePositiveLogger(context: Context) {
         append("dispatch_scheduled:$eventId", labels)
     }
 
+    fun recordDispatchUnavailable(eventId: String, reason: String) {
+        append("dispatch_unavailable:$eventId:$reason", emptyList())
+    }
+
     private fun append(type: String, labels: List<String>) {
         val old = runCatching { JSONArray(prefs.getString(KEY_EVENTS, "[]") ?: "[]") }
             .getOrDefault(JSONArray())

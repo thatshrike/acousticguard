@@ -14,6 +14,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 
 class MainActivity : Activity() {
@@ -21,6 +22,8 @@ class MainActivity : Activity() {
     private lateinit var pinInput: EditText
     private lateinit var phoneInput: EditText
     private lateinit var endpointInput: EditText
+    private lateinit var quietAlertSwitch: Switch
+    private lateinit var communityMeshSwitch: Switch
     private var permissionIndex = 0
 
     private val requiredPermissions: List<String>
@@ -30,6 +33,15 @@ class MainActivity : Activity() {
             add(Manifest.permission.ACCESS_COARSE_LOCATION)
             if (DispatchPreferences(this@MainActivity).phoneNumber.isNotEmpty()) {
                 add(Manifest.permission.SEND_SMS)
+            }
+            if (communityMeshSwitch.isChecked) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    add(Manifest.permission.BLUETOOTH_SCAN)
+                    add(Manifest.permission.BLUETOOTH_CONNECT)
+                    add(Manifest.permission.BLUETOOTH_ADVERTISE)
+                } else {
+                    add(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
             }
         }
 
@@ -69,6 +81,16 @@ class MainActivity : Activity() {
             setText(dispatch.httpsEndpoint)
         }
         add(endpointInput)
+        quietAlertSwitch = Switch(this).apply {
+            text = "Quiet alert mode (no app screen; Android disclosure remains)"
+            isChecked = dispatch.quietAlertMode
+        }
+        add(quietAlertSwitch)
+        communityMeshSwitch = Switch(this).apply {
+            text = "Enable encrypted nearby community mesh (optional)"
+            isChecked = dispatch.communityMeshEnabled
+        }
+        add(communityMeshSwitch)
 
         add(Button(this).apply {
             text = "Save emergency settings"
@@ -76,6 +98,8 @@ class MainActivity : Activity() {
                 dispatch.quickPin = pinInput.text.toString()
                 dispatch.phoneNumber = phoneInput.text.toString()
                 dispatch.httpsEndpoint = endpointInput.text.toString()
+                dispatch.quietAlertMode = quietAlertSwitch.isChecked
+                dispatch.communityMeshEnabled = communityMeshSwitch.isChecked
                 status.text = "Settings saved locally. Raw audio is not stored."
             }
         })

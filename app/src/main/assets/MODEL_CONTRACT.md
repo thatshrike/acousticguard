@@ -7,12 +7,19 @@ controlled dataset before release.
 
 Required tensor contract:
 
-- Input tensor 0: `FLOAT32`, mono PCM samples normalized to `[-1, 1]`.
+- Input tensor 0: `FLOAT32`, `INT8`, or `UINT8`, mono PCM samples represented by
+  the tensor's runtime quantization scale/zero-point. FLOAT32 uses `[-1, 1]`.
 - Input element count: any fixed count; the adapter right-aligns the last samples
   from the 3.5-second ring and zero-pads shorter input.
-- Output tensor 0: `FLOAT32`, one score per line in
-  `distress_multilingual_labels.txt`, in exactly that order.
-- Scores must be calibrated probabilities, not logits.
+- Output tensor 0: `FLOAT32`, `INT8`, or `UINT8`, one calibrated probability per
+  line in `distress_multilingual_labels.txt`, in exactly that order. Quantized
+  outputs are dequantized using the tensor's runtime scale/zero-point.
+- Scores must be finite calibrated probabilities in `[0, 1]`, not logits. A
+  malformed tensor or invalid score fails closed.
+
+The runtime attempts NNAPI when available and falls back to a two-thread CPU
+interpreter. Full-integer quantization must be calibrated on representative
+microphones and noise before the `0.82` threshold is considered valid.
 
 The labels intentionally include English, Hindi, and transliterated Hindi help
 keywords. Add language-specific labels only when the corresponding keyword-

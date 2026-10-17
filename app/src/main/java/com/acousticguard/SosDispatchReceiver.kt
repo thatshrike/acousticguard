@@ -10,9 +10,11 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.telephony.SmsManager
 import android.util.Log
+import android.util.Base64
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.UUID
 import java.util.concurrent.Executors
 
 /**
@@ -22,13 +24,24 @@ import java.util.concurrent.Executors
 class SosDispatchReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ExactAlarmScheduler.ACTION_DISPATCH) return
-        val pending = goAsync()
         val eventId = intent.getStringExtra(ExactAlarmScheduler.EXTRA_EVENT_ID).orEmpty()
+        if (!DispatchEventStore(context).claimForDispatch(eventId)) return
+        val pending = goAsync()
         val labels = intent.getStringArrayExtra(ExactAlarmScheduler.EXTRA_LABELS).orEmpty()
         EXECUTOR.execute {
-            try {
-                EmergencyDispatcher(context.applicationContext).dispatch(eventId, labels.toList())
-            } finally {
+        try {
+            EmergencyDispatcher(context.applicationContext).dispatch(eventId, labels.toList())
+        } finally {
+                runCatching {
+                    val serviceIntent = Intent(context, AcousticCaptureService::class.java)
+                        .setAction(AcousticCaptureService.ACTION_PRE_ALERT_RESOLVED)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
+                    } else {
+                        context.startService(serviceIntent)
+                    }
+                }.onFailure { Log.w("AcousticGuardDispatch", "Could not clear alert state", it) }
+                DispatchEventStore(context).markAttempted(eventId)
                 pending.finish()
             }
         }
@@ -41,8 +54,26 @@ class SosDispatchReceiver : BroadcastReceiver() {
 
 private class EmergencyDispatcher(private val context: Context) {
     fun dispatch(eventId: String, labels: List<String>) {
+        context.getSystemService(android.app.NotificationManager::class.java).cancel(101)
         val prefs = DispatchPreferences(context)
-        val payload = buildPayload(eventId, labels)
+        val eventUuid = runCatching { UUID.fromString(eventId) }.getOrNull() ?: return
+        val location = lastKnownCoarseLocation()
+        val encryptedPayload = runCatching {
+            SosPayloadCrypto(context).encrypt(
+                eventUuid,
+                System.currentTimeMillis(),
+                location?.first?.toFloat(),
+                location?.second?.toFloat(),
+                labels.toSignatureFlags()
+            )
+        }.getOrElse {
+            Log.e(TAG, "No authenticated SOS payload was produced", it)
+            return
+        }
+
+        if (prefs.communityMeshEnabled) {
+            CommunityMeshBroadcaster.start(context, encryptedPayload)
+        }
         if (prefs.phoneNumber.isNotEmpty() &&
             context.checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
         ) {
@@ -57,20 +88,14 @@ private class EmergencyDispatcher(private val context: Context) {
             }.onFailure { Log.e(TAG, "SMS dispatch failed", it) }
         }
         if (prefs.httpsEndpoint.startsWith("https://", ignoreCase = true)) {
+            val payload = JSONObject()
+                .put("protocol_version", 1)
+                .put("event_id", eventId)
+                .put("encrypted_payload_b64", Base64.encodeToString(encryptedPayload, Base64.NO_WRAP))
+                .toString()
             runCatching { postHttps(prefs.httpsEndpoint, payload) }
                 .onFailure { Log.e(TAG, "HTTPS dispatch failed", it) }
         }
-    }
-
-    private fun buildPayload(eventId: String, labels: List<String>): String {
-        val location = lastKnownCoarseLocation()
-        return JSONObject()
-            .put("event_id", eventId)
-            .put("detected_at_epoch_ms", System.currentTimeMillis())
-            .put("labels", labels)
-            .put("latitude", location?.first)
-            .put("longitude", location?.second)
-            .toString()
     }
 
     private fun lastKnownCoarseLocation(): Pair<Double, Double>? {
@@ -90,9 +115,13 @@ private class EmergencyDispatcher(private val context: Context) {
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
         }
-        connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
-        connection.inputStream.close()
-        connection.disconnect()
+        try {
+            connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) error("HTTPS endpoint returned $responseCode")
+        } finally {
+            connection.disconnect()
+        }
     }
 
     @Suppress("UNUSED_VARIABLE")
@@ -106,4 +135,14 @@ private class EmergencyDispatcher(private val context: Context) {
     companion object {
         private const val TAG = "AcousticGuardDispatch"
     }
+}
+
+private fun List<String>.toSignatureFlags(): Int {
+    val normalized = joinToString(" ").lowercase()
+    var flags = 0
+    if (normalized.contains("scream") || normalized.contains("friction")) flags = flags or SosSignatureFlags.SCREAM
+    if (normalized.contains("hyperventilation") || normalized.contains("gasp")) flags = flags or SosSignatureFlags.HYPERVENTILATION
+    if (normalized.contains("impact") || normalized.contains("thud") || normalized.contains("struggle")) flags = flags or SosSignatureFlags.IMPACT
+    if (normalized.contains("restraint") || normalized.contains("stridor")) flags = flags or SosSignatureFlags.RESTRAINT
+    return flags
 }

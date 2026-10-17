@@ -1,6 +1,7 @@
 package com.acousticguard
 
 import android.content.Context
+import android.os.Build
 import android.os.SystemClock
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
@@ -21,7 +22,9 @@ data class PipelineResult(
     val scores: ModelScores?,
     val consecutiveQualifyingWindows: Int,
     val validated: Boolean,
-    val modelError: String? = null
+    val modelError: String? = null,
+    val tierOneReasons: Set<TierOneReason> = emptySet(),
+    val fastTrack: Boolean = false
 )
 
 interface DistressModel : Closeable {
@@ -43,6 +46,12 @@ class TfliteDistressModel(context: Context) : DistressModel {
     private val labels: List<String>
     private val inputElements: Int
     private val outputElements: Int
+    private val inputType: DataType
+    private val outputType: DataType
+    private val inputScale: Float
+    private val inputZeroPoint: Int
+    private val outputScale: Float
+    private val outputZeroPoint: Int
 
     init {
         val model = context.assets.open("distress_multilingual.tflite").use { stream ->
@@ -52,15 +61,25 @@ class TfliteDistressModel(context: Context) : DistressModel {
                 rewind()
             }
         }
-        interpreter = Interpreter(model, Interpreter.Options().apply { setNumThreads(2) })
-        check(interpreter.getInputTensor(0).dataType() == DataType.FLOAT32) {
-            "AcousticGuard model input must be FLOAT32"
+        interpreter = createInterpreter(model)
+        val inputTensor = interpreter.getInputTensor(0)
+        val outputTensor = interpreter.getOutputTensor(0)
+        inputType = inputTensor.dataType()
+        outputType = outputTensor.dataType()
+        check(inputType == DataType.FLOAT32 || inputType == DataType.INT8 || inputType == DataType.UINT8) {
+            "Unsupported model input type: $inputType"
         }
-        check(interpreter.getOutputTensor(0).dataType() == DataType.FLOAT32) {
-            "AcousticGuard model output must be FLOAT32"
+        check(outputType == DataType.FLOAT32 || outputType == DataType.INT8 || outputType == DataType.UINT8) {
+            "Unsupported model output type: $outputType"
         }
-        inputElements = interpreter.getInputTensor(0).numElements()
-        outputElements = interpreter.getOutputTensor(0).numElements()
+        inputElements = inputTensor.numElements()
+        outputElements = outputTensor.numElements()
+        inputScale = inputTensor.quantizationParams().scale
+        inputZeroPoint = inputTensor.quantizationParams().zeroPoint
+        outputScale = outputTensor.quantizationParams().scale
+        outputZeroPoint = outputTensor.quantizationParams().zeroPoint
+        if (inputType != DataType.FLOAT32) check(inputScale > 0f) { "Invalid quantized input scale" }
+        if (outputType != DataType.FLOAT32) check(outputScale > 0f) { "Invalid quantized output scale" }
         labels = context.assets.open("distress_multilingual_labels.txt").bufferedReader().useLines {
             it.map(String::trim).filter(String::isNotEmpty).toList()
         }
@@ -70,20 +89,21 @@ class TfliteDistressModel(context: Context) : DistressModel {
     }
 
     override fun infer(pcm16: ShortArray): ModelScores {
-        val input = ByteBuffer.allocateDirect(inputElements * Float.SIZE_BYTES)
+        val input = ByteBuffer.allocateDirect(inputElements * bytesPerElement(inputType))
             .order(ByteOrder.nativeOrder())
-        val normalized = FloatArray(inputElements)
         val start = max(0, pcm16.size - inputElements)
         val copied = minOf(inputElements, pcm16.size)
-        for (i in 0 until copied) normalized[i] = pcm16[start + i] / 32768f
-        normalized.forEach(input::putFloat)
+        repeat(inputElements) { index ->
+            val value = if (index < copied) pcm16[start + index] / 32768f else 0f
+            writeInput(input, value)
+        }
         input.rewind()
 
-        val output = ByteBuffer.allocateDirect(outputElements * Float.SIZE_BYTES)
+        val output = ByteBuffer.allocateDirect(outputElements * bytesPerElement(outputType))
             .order(ByteOrder.nativeOrder())
         interpreter.run(input, output)
         output.rewind()
-        val scores = FloatArray(outputElements) { output.float.coerceIn(0f, 1f) }
+        val scores = FloatArray(outputElements) { readOutput(output) }
 
         var distress = 0f
         var keyword = 0f
@@ -107,9 +127,51 @@ class TfliteDistressModel(context: Context) : DistressModel {
 
     override fun close() = interpreter.close()
 
+    private fun writeInput(buffer: ByteBuffer, value: Float) {
+        when (inputType) {
+            DataType.FLOAT32 -> buffer.putFloat(value)
+            DataType.INT8 -> buffer.put((value / inputScale + inputZeroPoint).toInt().coerceIn(-128, 127).toByte())
+            DataType.UINT8 -> buffer.put((value / inputScale + inputZeroPoint).toInt().coerceIn(0, 255).toByte())
+            else -> error("Unsupported input type: $inputType")
+        }
+    }
+
+    private fun readOutput(buffer: ByteBuffer): Float {
+        val value = when (outputType) {
+            DataType.FLOAT32 -> buffer.float
+            DataType.INT8 -> (buffer.get().toInt() - outputZeroPoint) * outputScale
+            DataType.UINT8 -> ((buffer.get().toInt() and 0xFF) - outputZeroPoint) * outputScale
+            else -> error("Unsupported output type: $outputType")
+        }
+        check(value.isFinite() && value in 0f..1f) { "Model output is not a calibrated probability" }
+        return value
+    }
+
+    private fun bytesPerElement(type: DataType): Int = when (type) {
+        DataType.FLOAT32 -> Float.SIZE_BYTES
+        DataType.INT8, DataType.UINT8 -> 1
+        else -> error("Unsupported tensor type: $type")
+    }
+
+    private fun createInterpreter(model: ByteBuffer): Interpreter {
+        return try {
+            Interpreter(
+                model,
+                Interpreter.Options().apply {
+                    setNumThreads(2)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) setUseNNAPI(true)
+                }
+            )
+        } catch (_: Exception) {
+            Interpreter(model, Interpreter.Options().apply { setNumThreads(2) })
+        }
+    }
+
     companion object {
         private val DISTRESS_TERMS = setOf(
-            "distress", "scream", "cry", "sob", "hyperventilation", "struggle", "panic"
+            "distress", "scream", "cry", "sob", "hyperventilation", "struggle", "panic",
+            "screaming_vocal_friction", "hyperventilation_gasp", "physical_struggle_thud",
+            "physical_restraint_groan", "suffocation_stridor"
         )
         private val HELP_TERMS = setOf(
             "help", "help me", "madad", "मदद", "bachao", "bachaao", "बचाओ",
@@ -138,13 +200,33 @@ class DistressDetectionPipeline(
         tierOneAnomalous: Boolean,
         nowElapsedMs: Long = SystemClock.elapsedRealtime()
     ): PipelineResult {
+        return evaluateInternal(pcm16, tierOneAnomalous, nowElapsedMs, fastTrack = false)
+    }
+
+    @Synchronized
+    fun evaluate(
+        pcm16: ShortArray,
+        tierOne: TierOneFeatures,
+        nowElapsedMs: Long = SystemClock.elapsedRealtime()
+    ): PipelineResult {
+        return evaluateInternal(pcm16, tierOne.candidate, nowElapsedMs, tierOne.fastTrack, tierOne.reasons)
+    }
+
+    private fun evaluateInternal(
+        pcm16: ShortArray,
+        tierOneAnomalous: Boolean,
+        nowElapsedMs: Long,
+        fastTrack: Boolean,
+        reasons: Set<TierOneReason> = emptySet()
+    ): PipelineResult {
         if (!tierOneAnomalous) {
             consecutiveQualifying = 0
             validated = false
-            return PipelineResult(null, 0, false)
+            return PipelineResult(null, 0, false, tierOneReasons = reasons, fastTrack = fastTrack)
         }
-        if (nowElapsedMs - lastEvaluationAt < evaluationWindowMs) {
-            return PipelineResult(null, consecutiveQualifying, validated)
+        val cadenceMs = if (fastTrack) evaluationWindowMs / 2L else evaluationWindowMs
+        if (nowElapsedMs - lastEvaluationAt < cadenceMs) {
+            return PipelineResult(null, consecutiveQualifying, validated, tierOneReasons = reasons, fastTrack = fastTrack)
         }
         lastEvaluationAt = nowElapsedMs
 
@@ -156,11 +238,18 @@ class DistressDetectionPipeline(
                 consecutiveQualifying = 0
             }
             validated = consecutiveQualifying >= requiredWindows
-            PipelineResult(scores, consecutiveQualifying, validated)
+            PipelineResult(scores, consecutiveQualifying, validated, tierOneReasons = reasons, fastTrack = fastTrack)
         } catch (error: Exception) {
             consecutiveQualifying = 0
             validated = false
-            PipelineResult(null, 0, false, error.message ?: error.javaClass.simpleName)
+            PipelineResult(
+                null,
+                0,
+                false,
+                error.message ?: error.javaClass.simpleName,
+                reasons,
+                fastTrack
+            )
         }
     }
 
