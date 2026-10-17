@@ -10,3 +10,4 @@ captures/
 app/src/main/assets/distress_multilingual.tflite
 __pycache__/
 *.pyc
+*.apk
