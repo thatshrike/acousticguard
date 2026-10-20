@@ -37,6 +37,8 @@ class TfliteVoiceEmbeddingModel(
     private val inputZeroPoint: Int
     private val outputScale: Float
     private val outputZeroPoint: Int
+    private val inputBuffer: ByteBuffer?
+    private val outputBuffer: ByteBuffer?
     @Volatile private var closed = false
 
     /** False means this adapter is unavailable and must not suppress distress. */
@@ -109,9 +111,6 @@ class TfliteVoiceEmbeddingModel(
                 .order(ByteOrder.nativeOrder())
         } else null
     }
-
-    private val inputBuffer: ByteBuffer?
-    private val outputBuffer: ByteBuffer?
 
     @Synchronized
     override fun embed(pcm16: ShortArray, sampleRate: Int): FloatArray? {
