@@ -66,6 +66,9 @@ class TfliteDistressModel(context: Context) : DistressModel {
     private val outputScale: Float
     private val outputZeroPoint: Int
 
+    private val inputBuffer: ByteBuffer
+    private val outputBuffer: ByteBuffer
+
     init {
         val model = context.assets.open("distress_multilingual.tflite").use { stream ->
             val bytes = stream.readBytes()
@@ -99,25 +102,28 @@ class TfliteDistressModel(context: Context) : DistressModel {
         check(labels.size == outputElements) {
             "Model output has $outputElements values but labels file has ${labels.size} labels"
         }
+        inputBuffer = ByteBuffer.allocateDirect(inputElements * bytesPerElement(inputType))
+            .order(ByteOrder.nativeOrder())
+        outputBuffer = ByteBuffer.allocateDirect(outputElements * bytesPerElement(outputType))
+            .order(ByteOrder.nativeOrder())
     }
 
+    @Synchronized
     override fun infer(pcm16: ShortArray): ModelScores {
-        val input = ByteBuffer.allocateDirect(inputElements * bytesPerElement(inputType))
-            .order(ByteOrder.nativeOrder())
+        inputBuffer.clear()
         val start = max(0, pcm16.size - inputElements)
         val copied = minOf(inputElements, pcm16.size)
         repeat(inputElements) { index ->
             val sourceIndex = index - (inputElements - copied)
             val value = if (sourceIndex >= 0) pcm16[start + sourceIndex] / 32768f else 0f
-            writeInput(input, value)
+            writeInput(inputBuffer, value)
         }
-        input.rewind()
+        inputBuffer.rewind()
 
-        val output = ByteBuffer.allocateDirect(outputElements * bytesPerElement(outputType))
-            .order(ByteOrder.nativeOrder())
-        interpreter.run(input, output)
-        output.rewind()
-        val scores = FloatArray(outputElements) { readOutput(output) }
+        outputBuffer.clear()
+        interpreter.run(inputBuffer, outputBuffer)
+        outputBuffer.rewind()
+        val scores = FloatArray(outputElements) { readOutput(outputBuffer) }
 
         var distress = 0f
         var keyword = 0f

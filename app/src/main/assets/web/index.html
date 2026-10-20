@@ -4,1590 +4,369 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="shell-type" content="mobile_tab" />
-  <title>Aura Sanctuary — AcousticGuard</title>
+  <title>AcousticGuard — Silent Guardian</title>
+
+  <!-- Modular Design System & Components -->
+  <link rel="stylesheet" href="css/design-system.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/pages.css" />
+
   <style>
-    /* -------------------------------------------------------------
-       APPLE LIQUID GLASS DESIGN SYSTEM & FLUID TOKENS
-       ------------------------------------------------------------- */
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
-    }
-
-    :root {
-      --canvas: #07090e;
-      --glass-surface: rgba(16, 20, 30, 0.65);
-      --glass-subtle: rgba(13, 16, 24, 0.52);
-      --glass-border: rgba(255, 255, 255, 0.16);
-      --glass-border-subtle: rgba(255, 255, 255, 0.10);
-      --glass-specular: rgba(255, 255, 255, 0.35);
-      
-      --gold: #f5e3be;
-      --gold-light: #faeed4;
-      --gold-dim: #d8c7a3;
-      --gold-glow: rgba(245, 227, 190, 0.35);
-      --gold-subtle: rgba(245, 227, 190, 0.12);
-      
-      --emerald: #34d399;
-      --emerald-glow: rgba(52, 211, 153, 0.35);
-      --ruby: #f87171;
-      
-      --text-primary: #f5f5f7;
-      --text-secondary: #c7cbd4;
-      --text-tertiary: #8b92a3;
-      --text-dim: #5c6374;
-    }
-
-    /* Rock-solid, non-freezing document scrolling for Android WebView */
-    html {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: auto;
-      min-height: 100%;
-      overflow-x: hidden;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      background-color: var(--canvas);
-    }
-
-    body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      min-height: 100vh;
-      overflow-x: hidden;
-      overflow-y: visible;
-      touch-action: pan-y;
-      background-color: var(--canvas);
-      color: var(--text-primary);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "Manrope", sans-serif;
-      -webkit-font-smoothing: antialiased;
-      line-height: 1.45;
-    }
-
-    ::-webkit-scrollbar {
-      display: none;
-    }
-
-    .font-serif {
-      font-family: "Newsreader", "SF Pro Display", Georgia, serif;
-    }
-
-    .font-mono {
-      font-family: "JetBrains Mono", SFMono-Regular, Consolas, monospace;
-    }
-
-    /* Safe Area insets */
-    .pt-safe { padding-top: max(env(safe-area-inset-top, 16px), 16px); }
-    .pb-safe { padding-bottom: max(env(safe-area-inset-bottom, 20px), 20px); }
-
-    /* -------------------------------------------------------------
-       AUTHENTIC LIQUID GLASS CARDS & CAPSULES
-       ------------------------------------------------------------- */
-    .liquid-glass {
-      position: relative;
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.03) 40%, rgba(255, 255, 255, 0.01) 100%), var(--glass-surface);
-      backdrop-filter: blur(40px) saturate(220%);
-      -webkit-backdrop-filter: blur(40px) saturate(220%);
-      border: 1px solid var(--glass-border);
-      box-shadow: 
-        0 24px 50px -12px rgba(0, 0, 0, 0.85),
-        0 4px 16px rgba(0, 0, 0, 0.35),
-        inset 0 1px 1.5px 0 var(--glass-specular),
-        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.45);
-      border-radius: 28px;
-    }
-
-    /* Crisp specular rim light at the curved top */
-    .liquid-glass::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 14%;
-      right: 14%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.65) 50%, transparent 100%);
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    .liquid-glass-subtle {
-      position: relative;
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%), var(--glass-subtle);
-      backdrop-filter: blur(32px) saturate(200%);
-      -webkit-backdrop-filter: blur(32px) saturate(200%);
-      border: 1px solid var(--glass-border-subtle);
-      box-shadow: 
-        0 16px 36px -10px rgba(0, 0, 0, 0.75),
-        inset 0 1px 1px 0 rgba(255, 255, 255, 0.22),
-        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
-      border-radius: 24px;
-    }
-
-    .liquid-pill {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 100%), rgba(22, 27, 38, 0.6);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.20);
-      box-shadow: 
-        0 6px 16px rgba(0, 0, 0, 0.4),
-        inset 0 1px 1px rgba(255, 255, 255, 0.35);
-      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s, box-shadow 0.2s;
-    }
-
-    .liquid-pill:active {
-      transform: scale(0.97);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 100%), rgba(30, 36, 50, 0.8);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.45);
-    }
-
-    /* Ambient specular shimmer animation across glass */
-    .glass-specular-shimmer {
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      pointer-events: none;
-      overflow: hidden;
-      z-index: 1;
-    }
-    .glass-specular-shimmer::before {
-      content: '';
-      position: absolute;
-      top: -60%;
-      left: -60%;
-      width: 220%;
-      height: 220%;
-      background: radial-gradient(ellipse 65% 35% at center, rgba(245, 227, 190, 0.09) 0%, rgba(255, 255, 255, 0.03) 32%, transparent 68%);
-      transform: rotate(-24deg);
-      animation: glass-caustic 10s ease-in-out infinite alternate;
-    }
-    @keyframes glass-caustic {
-      0% { transform: rotate(-28deg) translateY(-6%) translateX(-6%); opacity: 0.6; }
-      50% { transform: rotate(-22deg) translateY(6%) translateX(4%); opacity: 0.95; }
-      100% { transform: rotate(-25deg) translateY(-2%) translateX(8%); opacity: 0.7; }
-    }
-
-    /* Dynamic sound wave visualizer bars */
-    .wave-bar {
-      transition: height 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease, opacity 0.3s ease;
-      will-change: height, opacity;
-    }
-
-    /* iOS Style Smooth Switch */
-    .custom-switch {
-      position: relative;
-      display: inline-flex;
-      height: 26px;
-      width: 48px;
-      flex-shrink: 0;
-      border-radius: 9999px;
-      padding: 2px;
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s;
-      cursor: pointer;
-    }
-    .custom-switch.active {
-      background: linear-gradient(135deg, #f5e3be 0%, #d8c7a3 100%);
-      border-color: #f5e3be;
-      box-shadow: 0 0 14px rgba(245, 227, 190, 0.45);
-    }
-    .custom-switch-knob {
-      display: inline-block;
-      height: 20px;
-      width: 20px;
-      border-radius: 9999px;
-      background: #c7cbd4;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-      transform: translateX(0);
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s;
-    }
-    .custom-switch.active .custom-switch-knob {
-      transform: translateX(22px);
-      background: #090b10;
-    }
-
-    /* Liquid Glass Input */
-    .liquid-input {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 16px;
-      padding: 13px 16px;
-      color: var(--gold);
-      font-size: 13px;
-      font-family: inherit;
-      width: 100%;
-      outline: none;
-      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-    }
-    .liquid-input:focus {
-      border-color: rgba(245, 227, 190, 0.6);
-      background: rgba(255, 255, 255, 0.08);
-      box-shadow: 0 0 16px rgba(245, 227, 190, 0.18);
-    }
-    .liquid-input::placeholder {
-      color: rgba(199, 203, 212, 0.45);
-    }
-
-    /* Pulsing breathing dot */
-    @keyframes pulseGlow {
-      0%, 100% { opacity: 0.9; transform: scale(1); }
-      50% { opacity: 0.25; transform: scale(1.6); }
-    }
-    .animate-ping-glow {
-      animation: pulseGlow 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-    }
-
-    /* -------------------------------------------------------------
-       FIXED FLOATING BOTTOM NAVIGATION PILL
-       ------------------------------------------------------------- */
-    .liquid-nav-container {
-      position: fixed;
-      bottom: 20px;
-      left: 0;
-      right: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 100;
-      pointer-events: none;
-      padding-left: 20px;
-      padding-right: 20px;
-      padding-bottom: max(env(safe-area-inset-bottom, 8px), 8px);
-    }
-    .liquid-nav-pill {
-      pointer-events: auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      max-width: 360px;
-      padding: 7px 10px;
-      border-radius: 9999px;
-      background: linear-gradient(180deg, rgba(28, 34, 48, 0.88) 0%, rgba(10, 12, 18, 0.96) 100%);
-      backdrop-filter: blur(40px) saturate(220%);
-      -webkit-backdrop-filter: blur(40px) saturate(220%);
-      border: 1px solid rgba(255, 255, 255, 0.20);
-      box-shadow: 
-        0 24px 48px rgba(0, 0, 0, 0.85),
-        0 4px 16px rgba(0, 0, 0, 0.4),
-        inset 0 1px 1.5px rgba(255, 255, 255, 0.4),
-        inset 0 -1px 1px rgba(0, 0, 0, 0.5);
-    }
-
-    /* SVG icon utility */
-    .icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1em;
-      height: 1em;
-      fill: currentColor;
-      vertical-align: middle;
-    }
-
-    /* Utility flex & typography */
-    .flex { display: flex; }
-    .flex-col { flex-direction: column; }
-    .items-center { align-items: center; }
-    .items-baseline { align-items: baseline; }
-    .justify-center { justify-content: center; }
-    .justify-between { justify-content: space-between; }
-    .flex-1 { flex: 1 1 0%; }
-    .w-full { width: 100%; }
-    .relative { position: relative; }
-    .absolute { position: absolute; }
-    .fixed { position: fixed; }
-    .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
-    .z-0 { z-index: 0; }
-    .z-10 { z-index: 10; }
-    .z-40 { z-index: 40; }
-    .z-50 { z-index: 50; }
-    .pointer-events-none { pointer-events: none; }
-    .pointer-events-auto { pointer-events: auto; }
-    .overflow-hidden { overflow: hidden; }
-    .overflow-y-auto { overflow-y: auto; }
-    .rounded-3xl { border-radius: 28px; }
-    .rounded-2xl { border-radius: 20px; }
-    .rounded-xl { border-radius: 14px; }
-    .rounded-full { border-radius: 9999px; }
-    .text-center { text-align: center; }
-    .hidden { display: none !important; }
-    .cursor-pointer { cursor: pointer; }
-
-    .text-gold { color: var(--gold); }
-    .text-gold-dim { color: var(--gold-dim); }
-    .text-emerald { color: var(--emerald); }
-    .text-ruby { color: var(--ruby); }
-
-    /* -------------------------------------------------------------
-       CONSISTENCY, ACCESSIBILITY & MOTION POLISH
-       ------------------------------------------------------------- */
-    button,
-    input {
-      font: inherit;
-    }
-
-    button {
-      -webkit-appearance: none;
-      appearance: none;
-    }
-
-    input {
-      -webkit-user-select: text;
-      user-select: text;
-    }
-
-    button,
-    .nav-tab,
-    [role="button"] {
-      touch-action: manipulation;
-    }
-
-    :where(button, input, .nav-tab, [role="button"]):focus-visible {
-      outline: 2px solid var(--gold-light);
-      outline-offset: 3px;
-      box-shadow: 0 0 0 5px rgba(245, 227, 190, 0.16), 0 0 22px rgba(245, 227, 190, 0.28);
-    }
-
-    :where(button, input, .nav-tab, [role="button"]):focus:not(:focus-visible) {
-      outline: none;
-    }
-
-    .liquid-pill {
-      color: var(--text-primary);
-      transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
-        background 180ms ease, border-color 180ms ease, box-shadow 180ms ease,
-        opacity 180ms ease;
-    }
-
-    button.liquid-pill:hover,
-    .liquid-pill[role="button"]:hover,
-    .nav-tab:hover {
-      border-color: rgba(255, 255, 255, 0.32);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.07) 100%), rgba(30, 36, 50, 0.72);
-      transform: translateY(-1px);
-    }
-
-    button.liquid-pill:active,
-    .liquid-pill[role="button"]:active,
-    .nav-tab:active {
-      transform: scale(0.98);
-    }
-
-    button.liquid-pill:disabled {
-      cursor: wait;
-      opacity: 0.58;
-      transform: none;
-    }
-
-    .liquid-glass,
-    .liquid-glass-subtle {
-      overflow: hidden;
-    }
-
-    .tab-panel:not(.hidden) {
-      animation: tab-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    }
-
-    @keyframes tab-enter {
-      from { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.992); }
-      to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-    }
-
-    .nav-tab {
-      min-height: 48px;
-      border-radius: 9999px;
-      transition: color 180ms ease, transform 180ms ease, background 180ms ease;
-    }
-
-    .active-indicator {
-      transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease;
-    }
-
-    .modal-backdrop {
-      background: rgba(4, 6, 10, 0.78) !important;
-      overscroll-behavior: contain;
-    }
-
-    .modal-backdrop:not(.hidden) {
-      animation: modal-fade 220ms ease both;
-    }
-
-    .modal-shell {
-      animation: modal-rise 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    }
-
-    @keyframes modal-fade {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    @keyframes modal-rise {
-      from { opacity: 0; transform: translateY(12px) scale(0.97); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-
-    .owner-voice-card {
-      border-color: rgba(245, 227, 190, 0.2);
-    }
-
-    .owner-voice-badge {
-      min-width: 66px;
-      padding: 6px 9px;
-      border: 1px solid rgba(245, 227, 190, 0.24);
-      border-radius: 9999px;
-      background: rgba(245, 227, 190, 0.09);
-      color: var(--gold-light);
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-align: center;
-      text-transform: uppercase;
-    }
-
-    .owner-voice-secondary {
-      color: var(--text-secondary) !important;
-      background: rgba(255, 255, 255, 0.06) !important;
-      border-color: rgba(255, 255, 255, 0.14) !important;
-    }
-
-    body.modal-open {
-      overflow: hidden;
-    }
-
+    /* Inline reduced motion declaration for instant style matching */
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        scroll-behavior: auto !important;
-        transition-duration: 0.01ms !important;
-      }
-
-      .glass-specular-shimmer::before,
-      .animate-ping-glow {
+      .hero-shield-icon, .toggle-switch::after, .spectrum-bar {
+        transition: none !important;
         animation: none !important;
-      }
-
-      .tab-panel:not(.hidden) {
-        animation: none;
       }
     }
   </style>
 </head>
-<body>
+<body class="pt-safe pb-safe">
 
-  <!-- ATMOSPHERIC RADIANT AMBIENT GLOW MESH (APPLE LIQUID REFRACTION ENGINE) -->
-  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
-    <!-- Top Warm Champagne / Amber Radiance -->
-    <div style="position:absolute; top:-120px; left:50%; transform:translateX(-50%); width:440px; height:380px; background:radial-gradient(ellipse 90% 60% at 50% 0%, rgba(245,227,190,0.18) 0%, rgba(217,119,6,0.06) 45%, transparent 75%); filter:blur(75px);"></div>
-    <!-- Left Emerald Sanctuary Aura -->
-    <div style="position:absolute; top:28%; left:-90px; width:300px; height:300px; background:radial-gradient(circle, rgba(52,211,153,0.09) 0%, transparent 70%); filter:blur(75px);"></div>
-    <!-- Right Celestial Indigo Aura -->
-    <div style="position:absolute; top:54%; right:-90px; width:320px; height:320px; background:radial-gradient(circle, rgba(99,102,241,0.09) 0%, transparent 70%); filter:blur(80px);"></div>
-    <!-- Bottom Ambient Reflection -->
-    <div style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); width:380px; height:200px; background:radial-gradient(circle, rgba(245,227,190,0.06) 0%, transparent 75%); filter:blur(75px);"></div>
+  <div class="page-container">
+    <!-- Top Bar -->
+    <header class="app-header">
+      <div class="brand-badge">
+        <span class="brand-dot" id="brandDot"></span>
+        <span>AcousticGuard</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button id="btnOpenPinModal" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" aria-label="Duress PIN Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span>PIN</span>
+        </button>
+        <button id="btnOpenRefModal" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" aria-label="Privacy & Diagnostics">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===================================================================
+         TAB 1: HAVEN (Sentinel Dashboard)
+         =================================================================== -->
+    <main id="tabHaven" class="tab-content active" role="tabpanel">
+      <!-- Liquid Glass Hero Card -->
+      <section class="liquid-glass hero-card state-idle" id="heroCard">
+        <div class="radar-sweep-container"></div>
+        <div class="hero-shield-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+        </div>
+        <h1 class="hero-title" id="heroTitle">Protection Paused</h1>
+        <p class="hero-subtitle" id="heroSubtitle">Tap below to activate autonomous on-device distress monitoring.</p>
+
+        <!-- Decibel Reading -->
+        <div class="db-display">
+          <span class="db-val" id="heroDbVal">--</span>
+          <span class="db-unit">dB SPL</span>
+        </div>
+
+        <!-- 32-Bar Real-Time Audio Spectrum Visualizer -->
+        <div class="spectrum-visualizer" id="spectrumVisualizer">
+          <!-- 32 bars generated dynamically via dashboard.js -->
+        </div>
+
+        <!-- Multi-Metric Glass Pills -->
+        <div class="metrics-row">
+          <div class="metric-pill">
+            <div class="label">Tier 1 DSP</div>
+            <div class="value" id="metricTierOne">0%</div>
+          </div>
+          <div class="metric-pill">
+            <div class="label">Neural AI</div>
+            <div class="value" id="metricNeural">0%</div>
+          </div>
+          <div class="metric-pill">
+            <div class="label">Sensor Fusion</div>
+            <div class="value" id="metricFusion">0%</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quick Action Cards -->
+      <section class="quick-actions-row">
+        <div class="liquid-glass-subtle quick-card">
+          <div>
+            <div class="title">Acoustic Shield</div>
+            <div class="desc">Continuous Sentinel</div>
+          </div>
+          <button id="btnToggleMonitoring" class="btn-primary" style="padding: 10px 16px; font-size: 13px;">Activate</button>
+        </div>
+        <div class="liquid-glass-subtle quick-card">
+          <div>
+            <div class="title">Simulate SOS</div>
+            <div class="desc">Test Safety Pipeline</div>
+          </div>
+          <button id="btnTestSos" class="btn-danger" style="padding: 10px 16px; font-size: 13px;">Test</button>
+        </div>
+      </section>
+
+      <!-- Status Timeline -->
+      <section style="margin-top: 10px;">
+        <div style="font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold-dim); margin-bottom: 8px;">
+          Live Acoustic Log
+        </div>
+        <div class="timeline-list" id="statusTimeline">
+          <div class="timeline-item emerald">System standby. Tap 'Activate' to begin sentinel monitoring.</div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ===================================================================
+         TAB 2: CITADEL (Settings & Calibration)
+         =================================================================== -->
+    <main id="tabCitadel" class="tab-content" role="tabpanel">
+      <!-- Safety Circle Group -->
+      <div class="settings-section-title">Emergency Safety Circle</div>
+      <section class="settings-group">
+        <div class="settings-row" style="flex-direction: column; align-items: stretch; gap: 12px;">
+          <div class="settings-info">
+            <span class="settings-label">Emergency Phone Number</span>
+            <span class="settings-caption">Dispatches encrypted SMS with exact GPS burst coordinates upon verified distress.</span>
+          </div>
+          <input type="tel" id="inputCirclePhone" class="settings-input" placeholder="+1 (555) 000-0000" />
+        </div>
+        <div class="settings-row" style="flex-direction: column; align-items: stretch; gap: 12px;">
+          <div class="settings-info">
+            <span class="settings-label">Encrypted HTTPS Endpoint</span>
+            <span class="settings-caption">Optional secure web hook for emergency relay and community responder networks.</span>
+          </div>
+          <input type="url" id="inputCircleEndpoint" class="settings-input" placeholder="https://responder.example.org/sos" />
+        </div>
+        <div class="settings-row">
+          <span id="circleStatusMsg" style="font-size: 12px; color: var(--emerald);"></span>
+          <button id="btnSaveCircle" class="btn-primary" style="padding: 10px 20px; font-size: 13px;">Save Circle</button>
+        </div>
+      </section>
+
+      <!-- Owner Voice Profile Group -->
+      <div class="settings-section-title">Owner Voice Profile</div>
+      <section class="settings-group">
+        <div class="settings-row">
+          <div class="settings-info">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="settings-label">Voice Calibration</span>
+              <span id="ownerVoicePill" class="liquid-glass-pill" style="padding: 2px 8px; font-size: 11px;">Not enrolled</span>
+            </div>
+            <span id="ownerVoiceStatusText" class="settings-caption">No owner voice enrolled. Ready for on-device calibration.</span>
+          </div>
+        </div>
+        <div class="settings-row">
+          <button id="btnClearOwnerVoice" class="btn-secondary" style="display: none; font-size: 12px; color: var(--ruby);">Clear Profile</button>
+          <button id="btnOwnerVoiceAction" class="btn-primary" style="padding: 10px 18px; font-size: 13px;">Start Owner Voice Enrollment</button>
+        </div>
+      </section>
+
+      <!-- Detection & Sensitivity -->
+      <div class="settings-section-title">Detection Sensitivity</div>
+      <section class="settings-group">
+        <div class="slider-container">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span class="settings-label">Distress Trigger Threshold</span>
+            <span id="sensitivityVal" style="font-size: 13px; font-weight: 700; color: var(--gold);">Balanced</span>
+          </div>
+          <input type="range" id="sensitivitySlider" min="1" max="5" value="3" />
+          <div class="slider-labels">
+            <span>Low (Fewer alerts)</span>
+            <span>Balanced</span>
+            <span>High (Max sensitivity)</span>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Quiet Alert Mode</span>
+            <span class="settings-caption">Suppresses sound countdown; uses subtle haptic pulses for covert danger scenarios.</span>
+          </div>
+          <div class="toggle-switch" id="ghostSwitch" role="switch" aria-checked="false"></div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Community BLE Mesh</span>
+            <span class="settings-caption">Relays encrypted SOS beacons to nearby AcousticGuard devices without internet.</span>
+          </div>
+          <div class="toggle-switch" id="meshSwitch" role="switch" aria-checked="false"></div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="settings-label">Ambient Baseline</span>
+              <span id="calibrationBadge" class="liquid-glass-pill" style="padding: 2px 8px; font-size: 11px;">0/3 samples</span>
+            </div>
+            <span class="settings-caption">Adapts DSP thresholds to home, office, or vehicle noise floors.</span>
+          </div>
+          <button id="btnRecordSafeSample" class="btn-secondary" style="font-size: 12px;">Record Safe Sample</button>
+        </div>
+      </section>
+
+      <!-- Security & Hardware Encryption -->
+      <div class="settings-section-title">Security & StrongBox</div>
+      <section class="settings-group">
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">AES-GCM Payload Key</span>
+            <span id="keyVersionText" class="settings-caption">Key Version 1 (StrongBox / Keystore)</span>
+          </div>
+          <button id="btnRotateKey" class="btn-secondary" style="font-size: 12px;">Rotate Key</button>
+        </div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Theme Mode</span>
+            <span class="settings-caption">Toggle between dark obsidian and light pearl liquid glass.</span>
+          </div>
+          <div class="toggle-switch" id="themeSwitch" role="switch" aria-checked="false"></div>
+        </div>
+      </section>
+
+      <!-- System Permissions -->
+      <div class="settings-section-title">System Permissions</div>
+      <section class="settings-group">
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Overlay Countdown</span>
+            <span class="settings-caption">Enables full-screen grace period countdown over locked screen.</span>
+          </div>
+          <button id="btnReqOverlay" class="btn-secondary" style="font-size: 12px;">Grant</button>
+        </div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Exact Alarm Scheduling</span>
+            <span class="settings-caption">Guarantees precise 10-second grace period execution during Doze.</span>
+          </div>
+          <button id="btnReqExactAlarm" class="btn-secondary" style="font-size: 12px;">Grant</button>
+        </div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <span class="settings-label">Battery Optimization</span>
+            <span class="settings-caption">Prevents Android from terminating the microphone background service.</span>
+          </div>
+          <button id="btnReqBattery" class="btn-secondary" style="font-size: 12px;">Exempt</button>
+        </div>
+      </section>
+    </main>
   </div>
 
-  <!-- NAVIGATION HEADER -->
-  <header class="fixed top-0 w-full z-40 pt-safe" style="background:rgba(7,9,14,0.72); backdrop-filter:blur(30px) saturate(200%); -webkit-backdrop-filter:blur(30px) saturate(200%); border-bottom:1px solid rgba(255,255,255,0.08);">
-    <div style="height:62px; padding:0 20px; display:flex; align-items:center; justify-content:space-between; max-width:440px; margin:0 auto; width:100%;">
-      <div class="flex items-center" style="gap:12px;">
-        <div class="w-9 h-9 rounded-2xl liquid-pill flex items-center justify-center text-gold cursor-pointer" id="brandLogoBtn" role="button" tabindex="0" aria-label="AcousticGuard home" style="width:36px; height:36px;">
-          <!-- graphic_eq icon -->
-          <svg class="icon" viewBox="0 0 24 24" style="font-size:18px;"><path d="M7 18h2V6H7v12zm4 4h2V2h-2v20zm-8-8h2v-4H3v4zm12 4h2V6h-2v12zm4-8v4h2v-4h-2z"/></svg>
-        </div>
-        <div>
-          <span style="font-size:9px; letter-spacing:0.26em; text-transform:uppercase; font-weight:700; color:rgba(216,199,163,0.85); display:block; line-height:1;">SANCTUARY</span>
-          <h1 class="font-serif" style="font-size:21px; font-weight:400; letter-spacing:-0.02em; color:#ffffff; line-height:1.15;">AcousticGuard</h1>
-        </div>
+  <!-- ===================================================================
+       FLOATING BOTTOM NAVIGATION BAR
+       =================================================================== -->
+  <nav class="bottom-nav" aria-label="Main Navigation">
+    <button class="nav-item active" data-tab="tabHaven" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+      </svg>
+      <span>Haven</span>
+    </button>
+    <button class="nav-item" data-tab="tabCitadel" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+      <span>Citadel</span>
+    </button>
+  </nav>
+
+  <!-- ===================================================================
+       MODAL 1: QUICK DURESS PIN KEYPAD
+       =================================================================== -->
+  <div class="modal-backdrop" id="pinModal" aria-hidden="true" role="dialog">
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <h2 style="font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 6px;">Safety PIN</h2>
+      <p style="font-size: 13px; color: var(--text-tertiary); text-align: center; margin-bottom: 16px;">
+        Cancel alerts securely. Entering reverse digits triggers silent duress dispatch.
+      </p>
+      <div id="pinDots" style="text-align: center; font-size: 24px; font-family: var(--font-mono, monospace); letter-spacing: 0.2em; min-height: 36px; color: var(--gold);">
+        Enter 4-8 digits
       </div>
-      <div class="flex items-center" style="gap:8px;">
-        <button type="button" class="liquid-pill flex items-center" style="padding:7px 14px; border-radius:9999px; font-size:11px; font-weight:600; color:#e2e8f0; gap:6px; cursor:pointer;" id="viewReferenceBtn" aria-haspopup="dialog" aria-controls="referenceModal">
-          <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:13px;"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
-          <span>Telemetry</span>
-        </button>
-        <div class="rounded-full liquid-pill flex items-center justify-center text-stone-300 cursor-pointer" id="fingerprintBtn" role="button" tabindex="0" aria-label="Open de-escalation PIN" aria-haspopup="dialog" aria-controls="pinModal" style="width:36px; height:36px;">
-          <svg class="icon" viewBox="0 0 24 24" style="font-size:17px;"><path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.47-5.57 1.41-.24.13-.54.04-.68-.2-.13-.24-.04-.55.2-.68C7.82 2.52 9.86 2 12.01 2c2.13 0 3.99.47 6.03 1.52.25.13.34.43.21.67-.09.18-.26.28-.44.28zM3.5 9.72c-.1 0-.2-.03-.29-.09-.23-.16-.28-.47-.12-.7.99-1.4 2.25-2.5 3.75-3.27C9.9 4.04 14.1 4.04 17.14 5.66c1.51.77 2.76 1.86 3.75 3.25.16.22.11.54-.12.7-.23.16-.54.11-.7-.12-.9-1.26-2.04-2.25-3.41-2.95-2.75-1.47-6.55-1.47-9.3 0-1.37.7-2.52 1.69-3.42 2.95-.1.15-.26.23-.44.23zm8.51 12.28c-.1 0-.2 0-.29-.01-4.01-.44-6.84-2.88-6.84-6.79 0-.28.22-.5.5-.5s.5.22.5.5c0 3.39 2.44 5.48 5.96 5.86.27.03.47.27.44.54-.02.26-.24.4-.47.4zm7.61-4.99c-.11 0-.22-.04-.31-.11-.22-.17-.26-.48-.09-.7.86-1.12 1.32-2.5 1.32-3.99 0-3.95-3.1-7.16-6.92-7.16-3.81 0-6.92 3.21-6.92 7.16 0 1.5.47 2.87 1.34 4 .17.22.13.53-.09.7-.22.17-.53.13-.7-.09-1.01-1.31-1.55-2.92-1.55-4.61 0-4.5 3.55-8.16 7.92-8.16 4.37 0 7.92 3.66 7.92 8.16 0 1.7-.52 3.29-1.5 4.58-.1.14-.26.22-.42.22zm-4.32 1.85c-.09 0-.18-.02-.27-.07-2.61-1.39-4.22-4.04-4.22-7.07 0-1.65 1.35-3 3-3s3 1.35 3 3c0 2.21 1.79 4 4 4 .28 0 .5.22.5.5s-.22.5-.5.5c-2.76 0-5-2.24-5-5 0-1.1-.9-2-2-2s-2 .9-2 2c0 2.58 1.37 4.84 3.6 6.03.24.13.34.43.21.68-.09.18-.27.28-.45.28z"/></svg>
-        </div>
+      <div class="pin-grid">
+        <button class="pin-key" data-val="1">1</button>
+        <button class="pin-key" data-val="2">2</button>
+        <button class="pin-key" data-val="3">3</button>
+        <button class="pin-key" data-val="4">4</button>
+        <button class="pin-key" data-val="5">5</button>
+        <button class="pin-key" data-val="6">6</button>
+        <button class="pin-key" data-val="7">7</button>
+        <button class="pin-key" data-val="8">8</button>
+        <button class="pin-key" data-val="9">9</button>
+        <button class="pin-key" id="btnPinClear" style="font-size: 18px;">⌫</button>
+        <button class="pin-key" data-val="0">0</button>
+        <button class="pin-key" id="btnSavePin" style="font-size: 14px; font-weight: 700; color: var(--gold);">OK</button>
       </div>
-    </div>
-  </header>
-
-  <!-- MAIN SCROLLABLE CONTENT AREA -->
-  <main style="max-width:440px; margin:0 auto; width:100%; padding:88px 18px 140px 18px; display:flex; flex-direction:column; gap:16px; position:relative; z-index:10;">
-
-    <!-- TAB 1: HAVEN (MAIN DASHBOARD) -->
-    <div id="tabContentHaven" class="tab-panel flex flex-col" role="tabpanel" aria-labelledby="navHaven" aria-hidden="false" style="gap:16px;">
-      
-      <!-- 1. HERO: LIQUID GLASS SCULPTED STATUS CARD -->
-      <section class="liquid-glass flex flex-col items-center text-center" id="heroCard" style="padding:28px 22px;">
-        <div class="glass-specular-shimmer"></div>
-        
-        <!-- Status indicator top pill -->
-        <div class="liquid-pill flex items-center rounded-full relative z-10" style="padding:5px 16px; gap:8px; margin-bottom:18px;">
-          <span style="position:relative; display:flex; height:8px; width:8px; align-items:center; justify-content:center;">
-            <span class="animate-ping-glow absolute" style="width:12px; height:12px; border-radius:9999px; background:rgba(52,211,153,0.75);" id="statusPulsePing"></span>
-            <span style="position:relative; width:6px; height:6px; border-radius:9999px; background:#34d399; box-shadow:0 0 10px rgba(52,211,153,0.9);" id="statusDot"></span>
-          </span>
-          <span class="font-mono" style="font-size:10px; letter-spacing:0.18em; text-transform:uppercase; font-weight:700; color:#f5f5f7;" id="statusBadgeText">ACTIVE • LOCAL NEURAL AI</span>
-        </div>
-
-        <!-- Decibel Display -->
-        <div class="flex flex-col items-center justify-center relative z-10" style="margin:2px 0 6px 0;">
-          <div class="flex items-baseline" style="gap:5px;">
-            <span class="font-mono" style="font-size:56px; font-weight:200; color:#ffffff; letter-spacing:-0.03em; text-shadow:0 2px 20px rgba(255,255,255,0.28); font-variant-numeric:tabular-nums;" id="heroDb">34.3</span>
-            <span class="font-mono" style="font-size:13px; font-weight:600; color:var(--text-tertiary);">dB</span>
-          </div>
-          <h2 class="font-serif" style="font-size:28px; font-weight:400; color:#ffffff; margin-top:4px; letter-spacing:-0.01em;" id="heroTitle">Silent Haven</h2>
-          <p style="font-size:12px; font-weight:300; color:var(--text-secondary); max-width:290px; line-height:1.5; margin-top:4px;" id="heroSubtitle">
-            Neural network analyzing audio frames in isolated memory. Ephemeral zero-retention.
-          </p>
-        </div>
-
-        <!-- Dynamic Live Acoustic Sound Wave Spectrum Visualizer -->
-        <div class="flex items-center justify-between relative z-10" id="serenityWave" style="width:100%; max-width:280px; height:38px; margin:18px 0 20px 0; gap:6px;">
-          <div class="wave-bar flex-1 rounded-full" style="height:8px; background:rgba(255,255,255,0.2);"></div>
-          <div class="wave-bar flex-1 rounded-full" style="height:14px; background:rgba(255,255,255,0.3);"></div>
-          <div class="wave-bar flex-1 rounded-full" style="height:22px; background:linear-gradient(to top, rgba(245,227,190,0.7), #f5e3be); box-shadow:0 0 10px rgba(245,227,190,0.45);"></div>
-          <div class="wave-bar flex-1 rounded-full" style="height:14px; background:rgba(255,255,255,0.4);"></div>
-          <div class="wave-bar flex-1 rounded-full" style="height:28px; background:linear-gradient(to top, #d8c7a3, #ffffff); box-shadow:0 0 14px rgba(245,227,190,0.65);"></div>
-          <div class="wave-bar flex-1 rounded-full" style="height:16px; background:rgba(255,255,255,0.4);"></div>
-          <div class="wave-bar flex-1 rounded-full" style="height:10px; background:rgba(255,255,255,0.3);"></div>
-          <div class="wave-bar flex-1 rounded-full" style="height:20px; background:linear-gradient(to top, rgba(245,227,190,0.7), #f5e3be); box-shadow:0 0 10px rgba(245,227,190,0.45);"></div>
-          <div class="wave-bar flex-1 rounded-full" style="height:8px; background:rgba(255,255,255,0.2);"></div>
-        </div>
-
-        <!-- Primary Control: Frosted Liquid Glass Button -->
-        <button class="liquid-pill flex items-center justify-center rounded-2xl w-full cursor-pointer relative z-10" id="toggleRestBtn" style="padding:15px 20px; font-size:13px; font-weight:600; letter-spacing:0.02em; gap:8px; color:#ffffff;">
-          <svg class="icon text-gold" id="toggleRestIcon" viewBox="0 0 24 24" style="font-size:18px;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-          <span id="toggleRestLabel">Pause Haven</span>
-        </button>
-      </section>
-
-      <!-- 2. REASSURANCE DRILL & SOS CONTROLS -->
-      <section class="liquid-glass-subtle flex flex-col" id="drillCard" style="padding:18px; gap:12px;">
-        <div class="glass-specular-shimmer"></div>
-        <div class="flex items-center justify-between relative z-10">
-          <div class="flex items-center" style="gap:12px;">
-            <div class="rounded-2xl liquid-pill flex items-center justify-center text-gold" id="drillIconBox" style="width:42px; height:42px;">
-              <svg class="icon" id="drillShieldIcon" viewBox="0 0 24 24" style="font-size:20px;"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
-            </div>
-            <div>
-              <h3 style="font-size:14px; font-weight:600; color:#ffffff;">Reassurance Drill</h3>
-              <p style="font-size:11px; color:var(--text-secondary);">Silent verification of guardian SMS dispatch</p>
-            </div>
-          </div>
-          <button class="liquid-pill rounded-xl cursor-pointer flex items-center justify-center" id="testSosBtn" style="padding:8px 18px; font-size:12px; font-weight:600; min-width:66px; color:#ffffff;">
-            <span id="testSosText">Test</span>
-          </button>
-        </div>
-
-        <!-- Countdown Progress Banner -->
-        <div class="hidden rounded-xl relative z-10 flex items-center justify-between overflow-hidden" id="countdownBanner" style="padding:12px 14px; background:rgba(245,227,190,0.12); border:1px solid rgba(245,227,190,0.35); color:#f5f5f4;">
-          <div style="position:absolute; top:0; bottom:0; left:0; width:0%; background:rgba(245,227,190,0.22); transition:width 1s linear;" id="drillProgressFill"></div>
-          <div class="flex items-center relative z-10" style="gap:8px;">
-            <span style="width:8px; height:8px; border-radius:9999px; background:#f5e3be;" class="animate-ping-glow"></span>
-            <span style="font-size:11px; font-weight:500;" id="drillBannerText">Dispatching mock verification in <span class="font-mono text-gold font-bold" id="secondsCount">3</span>s</span>
-          </div>
-          <button class="text-stone-200 font-mono underline relative z-10 cursor-pointer" id="cancelDrillBtn" style="font-size:11px; background:none; border:none; font-weight:600; padding:4px 8px;">Cancel</button>
-        </div>
-      </section>
-
-      <!-- 3. PROTECTION SETTINGS -->
-      <section class="liquid-glass-subtle overflow-hidden" style="display:flex; flex-direction:column;">
-        <div class="glass-specular-shimmer"></div>
-
-        <!-- Ghost Mode Switch (Quiet Alert) -->
-        <div class="flex items-center justify-between relative z-10" style="padding:16px 18px; border-bottom:1px solid rgba(255,255,255,0.07);">
-          <div class="flex items-center" style="gap:12px; padding-right:8px;">
-            <div class="rounded-xl liquid-pill flex items-center justify-center text-stone-300" style="width:36px; height:36px;">
-              <svg class="icon" viewBox="0 0 24 24" style="font-size:17px;"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.44-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-            </div>
-            <div>
-              <div style="font-size:13px; font-weight:600; color:#ffffff;">Ghost Mode</div>
-              <div style="font-size:11px; color:var(--text-secondary);">Haptic only; zero display lighting during alerts</div>
-            </div>
-          </div>
-           <button class="custom-switch" id="ghostSwitch" type="button" role="switch" aria-label="Ghost Mode" aria-checked="false">
-            <span class="custom-switch-knob" id="ghostKnob"></span>
-          </button>
-        </div>
-
-        <!-- Peer Relay Mesh Switch -->
-        <div class="flex items-center justify-between relative z-10" style="padding:16px 18px; border-bottom:1px solid rgba(255,255,255,0.07);">
-          <div class="flex items-center" style="gap:12px; padding-right:8px;">
-            <div class="rounded-xl liquid-pill flex items-center justify-center text-stone-300" style="width:36px; height:36px;">
-              <svg class="icon" viewBox="0 0 24 24" style="font-size:17px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4.5-9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm9 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm-4.5 4.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>
-            </div>
-            <div>
-              <div style="font-size:13px; font-weight:600; color:#ffffff;">Peer Relay Mesh</div>
-              <div style="font-size:11px; color:var(--text-secondary);">Bluetooth circle fallback if cellular drops</div>
-            </div>
-          </div>
-           <button class="custom-switch" id="meshSwitch" type="button" role="switch" aria-label="Peer Relay Mesh" aria-checked="false">
-            <span class="custom-switch-knob" id="meshKnob"></span>
-          </button>
-        </div>
-
-        <!-- Safe PIN Row -->
-        <div class="flex items-center justify-between relative z-10 cursor-pointer" id="pinRow" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="pinModal" style="padding:16px 18px;">
-          <div class="flex items-center" style="gap:12px;">
-            <div class="rounded-xl liquid-pill flex items-center justify-center text-stone-300" style="width:36px; height:36px;">
-              <svg class="icon" viewBox="0 0 24 24" style="font-size:17px;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 4h2v2h-2V7zm0 4h2v2h-2v-2zm-4-4h2v2H7V7zm0 4h2v2H7v-2zm-2 6v-2h14v2H5zm12-6h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
-            </div>
-            <div>
-              <div style="font-size:13px; font-weight:600; color:#ffffff;">De-escalation PIN</div>
-              <div style="font-size:11px; color:var(--text-secondary);">Silent false alarm dismissal &amp; secret duress code</div>
-            </div>
-          </div>
-          <div class="flex items-center text-stone-400" style="gap:6px;">
-            <span class="text-gold font-mono" id="pinDots" style="letter-spacing:0.25em; font-size:16px; text-shadow:0 0 8px rgba(245,227,190,0.45);">••••</span>
-            <svg class="icon" viewBox="0 0 24 24" style="font-size:16px;"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-          </div>
-        </div>
-      </section>
-
-      <!-- 4. ENGINE TELEMETRY ACCORDION -->
-      <section class="liquid-glass-subtle overflow-hidden flex flex-col">
-        <div class="glass-specular-shimmer"></div>
-        <button type="button" class="flex items-center justify-between text-left cursor-pointer relative z-10" id="vitalityAccordionBtn" aria-expanded="false" aria-controls="vitalityContent" style="padding:16px 18px; width:100%; background:none; border:none; color:inherit;">
-          <div class="flex items-center" style="gap:12px;">
-            <div class="rounded-xl liquid-pill flex items-center justify-center text-stone-300" style="width:36px; height:36px;">
-              <svg class="icon" viewBox="0 0 24 24" style="font-size:17px;"><path d="M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.28-10.43zM10.59 15.41a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z"/></svg>
-            </div>
-            <div>
-              <h4 style="font-size:13px; font-weight:600; color:#ffffff;">Diagnostics &amp; Health</h4>
-              <p style="font-size:11px; color:var(--text-secondary);">Multilingual Neural Model · Minimal power draw</p>
-            </div>
-          </div>
-          <svg class="icon text-stone-400" id="accordionChevron" viewBox="0 0 24 24" style="font-size:18px; transition:transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
-        </button>
-
-        <div class="hidden flex-col relative z-10" id="vitalityContent" style="background:rgba(0,0,0,0.35); border-top:1px solid rgba(255,255,255,0.07);">
-          <div class="flex items-center justify-between" style="padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.05); font-size:11px;">
-            <span style="color:var(--text-secondary);">On-Device Neural Engine Load</span>
-            <span class="font-mono flex items-center" style="gap:6px; color:#ffffff;">
-              <span style="width:6px; height:6px; border-radius:9999px; background:#34d399; box-shadow:0 0 6px #34d399;"></span>1.1% Engine Load
-            </span>
-          </div>
-          <div class="flex items-center justify-between" style="padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.05); font-size:11px;">
-            <span style="color:var(--text-secondary);">Battery Drain Impact</span>
-            <span class="font-mono" style="color:#ffffff;">&lt; 0.4mW / hr</span>
-          </div>
-          <div class="flex items-center justify-between" style="padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.05); font-size:11px;">
-            <span style="color:var(--text-secondary);">Harmonic Rejection</span>
-            <span class="font-mono" style="color:#ffffff;">Calibrated (50/60Hz Notch)</span>
-          </div>
-          <div class="flex items-center justify-between" style="padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.05); font-size:11px;">
-            <span style="color:var(--text-secondary);">Privacy Boundary</span>
-            <span class="font-mono text-gold flex items-center" style="gap:4px;">
-              <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:12px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Zero Audio Uploaded
-            </span>
-          </div>
-          <div class="flex items-center justify-between" style="padding:12px 18px; border-bottom:1px solid rgba(255,255,255,0.05); font-size:11px;">
-            <span style="color:var(--text-secondary);">Audio Driver Pipeline</span>
-            <span class="font-mono" style="color:#ffffff;" id="diagNativeAudio">AudioRecord 16kHz</span>
-          </div>
-          <div class="flex items-center justify-between" style="padding:12px 18px; font-size:11px;">
-            <span style="color:var(--text-secondary);">Relay Ring Status</span>
-            <span class="font-mono" style="color:#ffffff;" id="diagMeshStatus">Mesh Standby</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 5. STREAMLINED FOOTNOTE -->
-      <div style="padding-top:4px; text-align:center;">
-        <p class="font-mono flex items-center justify-center" style="font-size:10px; gap:6px; color:var(--text-tertiary);">
-          <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:12px;"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-          <span>On-device NeuralDSP · Ephemeral telemetry only</span>
-        </p>
-      </div>
-    </div>
-
-    <!-- TAB 2: AUDIO / NEURAL CALIBRATION -->
-    <div id="tabContentAudio" class="tab-panel hidden flex flex-col" role="tabpanel" aria-labelledby="navAudio" aria-hidden="true" style="gap:16px;">
-      <section class="liquid-glass flex flex-col" style="padding:24px 20px; gap:16px;">
-        <div class="glass-specular-shimmer"></div>
-        <div class="relative z-10">
-          <span style="font-size:9px; letter-spacing:0.22em; text-transform:uppercase; font-weight:700; color:#d8c7a3;">NEURAL CALIBRATION</span>
-          <h2 class="font-serif" style="font-size:24px; color:#ffffff; margin-top:2px;">Safe Profile Adaptation</h2>
-          <p style="font-size:12px; font-weight:300; color:var(--text-secondary); line-height:1.5; margin-top:4px;">
-            Teach AcousticGuard your normal vocal signature and home noise floor. 3 quick samples train the local AI to reject false triggers from normal speech.
-          </p>
-        </div>
-
-        <div class="liquid-pill rounded-2xl flex items-center justify-between relative z-10" style="padding:14px 18px;">
-          <div>
-            <div style="font-size:12px; font-weight:600; color:#ffffff;">Calibration Baseline</div>
-            <div class="font-mono" style="font-size:11px; color:var(--text-secondary);" id="audioSampleStatus">0 of 3 samples recorded</div>
-          </div>
-          <span class="font-mono text-gold" style="font-size:18px; font-weight:bold;" id="audioSampleCountPill">0/3</span>
-        </div>
-
-        <button class="liquid-pill rounded-2xl flex items-center justify-center cursor-pointer relative z-10" id="recordSafeSampleBtn" style="padding:15px 20px; font-size:12px; font-weight:600; gap:8px; color:#ffffff;">
-          <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:17px;"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
-          <span id="recordSafeSampleText">Record Safe Profile Sample</span>
-        </button>
-
-        <div class="text-center relative z-10" style="font-size:11px; line-height:1.4; color:var(--text-tertiary);" id="audioCalibrationMsg">
-          Tap to record a sample while speaking or in normal room audio.
-        </div>
-      </section>
-
-       <section class="liquid-glass-subtle owner-voice-card flex flex-col" id="ownerVoiceCard" style="padding:20px 18px; gap:14px;">
-         <div class="glass-specular-shimmer"></div>
-         <div class="flex items-start justify-between relative z-10" style="gap:12px;">
-           <div class="flex items-start" style="gap:12px;">
-             <div class="rounded-2xl liquid-pill flex items-center justify-center text-gold" aria-hidden="true" style="width:42px; height:42px; flex-shrink:0;">
-               <svg class="icon" viewBox="0 0 24 24" style="font-size:20px;"><path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zm-5 8a1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0zm5 9h2v2h-2v-2z"/></svg>
-             </div>
-             <div>
-               <h3 style="font-size:14px; font-weight:600; color:#ffffff;">Owner Voice Profile</h3>
-               <p style="font-size:11px; line-height:1.45; color:var(--text-secondary); margin-top:3px;">A private voice signature helps reduce false triggers from familiar speech.</p>
-             </div>
-           </div>
-           <span class="owner-voice-badge" id="ownerVoiceStatePill">Not set</span>
-         </div>
-
-         <div class="liquid-pill rounded-2xl flex items-center justify-between relative z-10" style="padding:13px 14px; gap:12px;">
-           <div>
-             <div id="ownerVoiceStatusLabel" style="font-size:12px; font-weight:600; color:#ffffff;">No profile enrolled</div>
-             <div id="ownerVoiceStatusMeta" class="font-mono" style="font-size:10px; color:var(--text-secondary); margin-top:3px;">Ready for an on-device enrollment</div>
-           </div>
-           <svg class="icon text-gold" aria-hidden="true" viewBox="0 0 24 24" style="font-size:18px; flex-shrink:0;"><path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zm-5 8a1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0zm5 9h2v2h-2v-2z"/></svg>
-         </div>
-
-         <div class="flex flex-col relative z-10" style="gap:8px;">
-           <button type="button" class="liquid-pill rounded-2xl flex items-center justify-center cursor-pointer" id="ownerVoiceActionBtn" style="padding:14px 16px; font-size:12px; font-weight:600; gap:8px; color:#ffffff;">
-             <svg class="icon text-gold" aria-hidden="true" viewBox="0 0 24 24" style="font-size:17px;"><path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zm-5 8a1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0zm5 9h2v2h-2v-2z"/></svg>
-             <span id="ownerVoiceActionText">Start Owner Voice Enrollment</span>
-           </button>
-           <button type="button" class="liquid-pill owner-voice-secondary rounded-2xl flex items-center justify-center cursor-pointer hidden" id="clearOwnerVoiceBtn" style="padding:11px 16px; font-size:11px; font-weight:600; gap:8px;">
-             <span id="clearOwnerVoiceText">Clear Owner Voice Profile</span>
-           </button>
-         </div>
-         <p class="relative z-10" id="ownerVoiceStatus" role="status" aria-live="polite" style="font-size:10px; line-height:1.4; color:var(--text-tertiary);">Voice features remain on this device.</p>
-       </section>
-
-      <section class="liquid-glass-subtle flex flex-col" style="padding:20px 18px; gap:12px;">
-        <div class="glass-specular-shimmer"></div>
-        <h3 style="font-size:14px; font-weight:600; color:#ffffff;" class="relative z-10">Dynamic Environmental Learning</h3>
-        <p class="relative z-10" style="font-size:11px; line-height:1.45; color:var(--text-secondary);">
-          Whenever you dismiss a false alert with your PIN, AcousticGuard's local neural model dynamically raises its friction threshold to adapt to that specific environment.
-        </p>
-      </section>
-    </div>
-
-    <!-- TAB 3: CIRCLE / EMERGENCY DISPATCH -->
-    <div id="tabContentCircle" class="tab-panel hidden flex flex-col" role="tabpanel" aria-labelledby="navCircle" aria-hidden="true" style="gap:16px;">
-      <section class="liquid-glass flex flex-col" style="padding:24px 20px; gap:16px;">
-        <div class="glass-specular-shimmer"></div>
-        <div class="relative z-10">
-          <span style="font-size:9px; letter-spacing:0.22em; text-transform:uppercase; font-weight:700; color:#d8c7a3;">GUARDIAN CIRCLE</span>
-          <h2 class="font-serif" style="font-size:24px; color:#ffffff; margin-top:2px;">Emergency Contacts</h2>
-          <p style="font-size:12px; font-weight:300; color:var(--text-secondary); line-height:1.5; margin-top:4px;">
-            Configure optional cellular and HTTPS channels. Audio is never sent; only an authenticated AES-GCM envelope with coarse location is dispatched.
-          </p>
-        </div>
-
-        <div class="flex flex-col relative z-10" style="gap:8px;">
-          <label style="font-size:11px; font-weight:600; color:#ffffff;">Emergency SMS Recipient</label>
-          <input type="tel" class="liquid-input font-mono" id="circlePhoneInput" placeholder="+1234567890 (optional)" />
-        </div>
-
-        <div class="flex flex-col relative z-10" style="gap:8px;">
-          <label style="font-size:11px; font-weight:600; color:#ffffff;">HTTPS Dispatch Endpoint</label>
-          <input type="url" class="liquid-input font-mono" id="circleEndpointInput" placeholder="https://your-server.com/sos (optional)" />
-        </div>
-
-        <button class="liquid-pill rounded-2xl flex items-center justify-center cursor-pointer relative z-10" id="saveCircleBtn" style="padding:15px 20px; font-size:12px; font-weight:600; gap:8px; color:#ffffff;">
-          <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:17px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-          <span>Save Dispatch Contacts</span>
-        </button>
-        <div class="text-center relative z-10" style="font-size:11px; color:var(--emerald);" id="circleStatusMsg"></div>
-      </section>
-
-      <section class="liquid-glass-subtle flex flex-col" style="padding:20px 18px; gap:10px;">
-        <div class="glass-specular-shimmer"></div>
-        <div class="flex items-center" style="gap:8px;">
-          <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:18px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-          <h3 style="font-size:13px; font-weight:600; color:#ffffff;">Duress PIN Protection</h3>
-        </div>
-        <p style="font-size:11px; line-height:1.45; color:var(--text-secondary);">
-          Entering the reverse of your PIN (e.g. <strong>4321</strong> if your PIN is <strong>1234</strong>) displays a fake cancellation confirmation on-screen while silently firing an immediate encrypted SOS.
-        </p>
-      </section>
-    </div>
-
-    <!-- TAB 4: SETTINGS / DEFENSIVE CONTROLS -->
-    <div id="tabContentSettings" class="tab-panel hidden flex flex-col" role="tabpanel" aria-labelledby="navSettings" aria-hidden="true" style="gap:16px;">
-      <section class="liquid-glass flex flex-col" style="padding:24px 20px; gap:16px;">
-        <div class="glass-specular-shimmer"></div>
-        <div class="relative z-10">
-          <span style="font-size:9px; letter-spacing:0.22em; text-transform:uppercase; font-weight:700; color:#d8c7a3;">SYSTEM ACCESS</span>
-          <h2 class="font-serif" style="font-size:24px; color:#ffffff; margin-top:2px;">Reliability Controls</h2>
-          <p style="font-size:12px; font-weight:300; color:var(--text-secondary); line-height:1.5; margin-top:4px;">
-            AcousticGuard uses explicit Android special access to survive Doze mode, aggressive OEM process killers, and lockscreen interruptions.
-          </p>
-        </div>
-
-        <!-- Overlay Access -->
-        <div class="liquid-glass-subtle rounded-2xl flex items-center justify-between relative z-10" style="padding:14px 16px;">
-          <div>
-            <div style="font-size:13px; font-weight:600; color:#ffffff;">Countdown Overlay</div>
-            <div style="font-size:11px; color:var(--text-secondary);">Allows prompt cancellation over other apps</div>
-          </div>
-          <button class="liquid-pill rounded-xl cursor-pointer" id="btnReqOverlay" style="padding:8px 16px; font-size:11px; font-weight:600; color:#ffffff;">Grant</button>
-        </div>
-
-        <!-- Exact Alarm Access -->
-        <div class="liquid-glass-subtle rounded-2xl flex items-center justify-between relative z-10" style="padding:14px 16px;">
-          <div>
-            <div style="font-size:13px; font-weight:600; color:#ffffff;">Exact Alarm Scheduling</div>
-            <div style="font-size:11px; color:var(--text-secondary);">Doze-resistant SOS dispatch timer</div>
-          </div>
-          <button class="liquid-pill rounded-xl cursor-pointer" id="btnReqExactAlarm" style="padding:8px 16px; font-size:11px; font-weight:600; color:#ffffff;">Grant</button>
-        </div>
-
-        <!-- Battery Optimization Exemption -->
-        <div class="liquid-glass-subtle rounded-2xl flex items-center justify-between relative z-10" style="padding:14px 16px;">
-          <div>
-            <div style="font-size:13px; font-weight:600; color:#ffffff;">Battery Optimization</div>
-            <div style="font-size:11px; color:var(--text-secondary);">Exempt from background power throttling</div>
-          </div>
-          <button class="liquid-pill rounded-xl cursor-pointer" id="btnReqBattery" style="padding:8px 16px; font-size:11px; font-weight:600; color:#ffffff;">Grant</button>
-        </div>
-
-        <!-- Key Rotation -->
-        <div class="liquid-glass-subtle rounded-2xl flex items-center justify-between relative z-10" style="padding:14px 16px;">
-          <div>
-            <div style="font-size:13px; font-weight:600; color:#ffffff;">SOS Encryption Key</div>
-            <div class="font-mono" style="font-size:11px; color:var(--text-secondary);" id="keyVersionText">Key Version 1 (StrongBox / Keystore)</div>
-          </div>
-          <button class="liquid-pill rounded-xl cursor-pointer" id="btnRotateKey" style="padding:8px 16px; font-size:11px; font-weight:600; color:#ffffff;">Rotate</button>
-        </div>
-      </section>
-    </div>
-
-  </main>
-
-  <!-- PIN CONFIGURATION MODAL -->
-  <div class="hidden fixed inset-0 z-50 flex items-center justify-center p-5 modal-backdrop" id="pinModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="pinModalTitle" tabindex="-1" style="background:rgba(0,0,0,0.85); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); padding:20px;">
-    <div class="liquid-glass modal-shell overflow-hidden flex flex-col" style="max-width:340px; width:100%; border:1px solid rgba(255,255,255,0.22);">
-      <div class="flex items-center justify-between" style="padding:18px; border-bottom:1px solid rgba(255,255,255,0.1);">
-        <div class="flex items-center" style="gap:8px;">
-          <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:18px;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 4h2v2h-2V7zm0 4h2v2h-2v-2zm-4-4h2v2H7V7zm0 4h2v2H7v-2zm-2 6v-2h14v2H5zm12-6h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
-          <span class="font-serif" id="pinModalTitle" style="font-size:17px; color:#ffffff;">De-escalation PIN</span>
-        </div>
-        <button type="button" class="liquid-pill rounded-full flex items-center justify-center text-stone-300 cursor-pointer" id="closePinModalBtn" aria-label="Close PIN dialog" style="width:30px; height:30px; border:none;">
-          <svg class="icon" viewBox="0 0 24 24" style="font-size:16px;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-        </button>
-      </div>
-      <div class="flex flex-col" style="padding:20px; gap:14px;">
-        <p style="font-size:12px; line-height:1.45; color:var(--text-secondary);">
-          Set a 4–8 digit PIN used to dismiss false alarms during the grace countdown.
-        </p>
-        <input type="password" inputmode="numeric" class="liquid-input font-mono" id="modalPinInput" placeholder="Enter 4–8 digits" maxlength="8" style="letter-spacing:0.25em; text-align:center; font-size:18px;" />
-        <p class="font-mono" style="font-size:10px; line-height:1.4; color:var(--text-tertiary);">
-          💡 Duress feature: entering the reverse of this PIN aborts the countdown visibly while secretly dispatching an immediate SOS.
-        </p>
-        <button type="button" class="liquid-pill rounded-xl cursor-pointer" id="savePinModalBtn" style="padding:13px; font-size:12px; font-weight:600; width:100%; color:#ffffff;">
-          Save PIN
-        </button>
+      <div style="text-align: center; margin-top: 20px;">
+        <button class="btn-secondary" id="btnClosePinModal" style="padding: 8px 24px;">Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- BASELINE REFERENCE MODAL -->
-  <div class="hidden fixed inset-0 z-50 flex items-center justify-center p-5 modal-backdrop" id="referenceModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="referenceModalTitle" tabindex="-1" style="background:rgba(0,0,0,0.85); backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px); padding:20px;">
-    <div class="liquid-glass modal-shell overflow-hidden flex flex-col" style="max-width:340px; width:100%; border:1px solid rgba(255,255,255,0.22); max-height:80vh;">
-      <div class="flex items-center justify-between" style="padding:18px; border-bottom:1px solid rgba(255,255,255,0.1);">
-        <div class="flex items-center" style="gap:8px;">
-          <svg class="icon text-gold" viewBox="0 0 24 24" style="font-size:17px;"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z"/></svg>
-          <span class="font-serif" id="referenceModalTitle" style="font-size:17px; color:#ffffff;">Telemetry &amp; Engine Spec</span>
-        </div>
-        <button type="button" class="liquid-pill rounded-full flex items-center justify-center text-stone-300 cursor-pointer" id="closeReferenceBtn" aria-label="Close telemetry dialog" style="width:30px; height:30px; border:none;">
-          <svg class="icon" viewBox="0 0 24 24" style="font-size:16px;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-        </button>
+  <!-- ===================================================================
+       MODAL 2: PRIVACY & ARCHITECTURE REFERENCE
+       =================================================================== -->
+  <div class="modal-backdrop" id="refModal" aria-hidden="true" role="dialog">
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 12px;">Architecture & Privacy</h2>
+      <div style="display: flex; flex-direction: column; gap: 14px; font-size: 13.5px; color: var(--text-secondary); line-height: 1.5;">
+        <p><strong>Zero Audio Retention:</strong> Audio frames are held solely in a volatile circular RAM buffer. No recordings or audio files are ever written to disk or transmitted.</p>
+        <p><strong>Two-Tier Detection:</strong> Tier 1 DSP pre-filters for vocal cord friction, respiratory rhythm, and shock transients. Only candidate frames are evaluated by Tier 2 TFLite neural models.</p>
+        <p><strong>Offline Resilient Dispatch:</strong> If distress is validated and not canceled within the 10-second grace period, AcousticGuard dispatches via SMS, local BLE mesh relay, and an encrypted HTTPS outbox.</p>
       </div>
-      <div class="overflow-y-auto flex flex-col" style="padding:18px; gap:12px; font-size:11px; color:#d6d3d1;">
-        <div style="background:rgba(255,255,255,0.04); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
-          <div style="font-weight:700; color:#f5e3be; margin-bottom:6px;">Pipeline Specifications</div>
-          <div>• Capture: 16 kHz mono PCM16 (isolated :remote process)</div>
-          <div>• Tier 1 Gate: 500 ms RMS + ZCR + Hann FFT (3.5–8 kHz)</div>
-          <div>• Tier 2 Inference: Local Neural Perceptron Classifier</div>
-          <div>• Respiratory Periodicity: 10 Hz scalar autocorrelation</div>
-          <div>• Motion Fusion: Accelerometer + Gyroscope spike coupling</div>
-          <div>• Grace Period: 10 s countdown (5 s in Ghost Mode)</div>
-          <div>• Dispatch: Hardware-backed AES-GCM encrypted envelope</div>
-        </div>
-        <p class="text-center" style="font-size:10px; color:var(--text-tertiary);">
-          AcousticGuard strictly enforces privacy: zero unencrypted audio leaves your device.
-        </p>
+      <div style="text-align: center; margin-top: 24px;">
+        <button class="btn-primary" id="btnCloseRefModal" style="width: 100%;">Understood</button>
       </div>
     </div>
   </div>
 
-  <!-- FLOATING DETACHED PILL BOTTOM NAVIGATION (PERMANENTLY ANCHORED) -->
-  <div class="liquid-nav-container">
-    <nav class="liquid-nav-pill" id="bottomNav">
-      
-      <!-- Haven Tab -->
-      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-gold cursor-pointer" id="navHaven" data-tab="haven" role="tab" tabindex="0" aria-selected="true" aria-controls="tabContentHaven" style="padding:6px 0; gap:3px; text-decoration:none;">
-        <div class="active-indicator" style="position:absolute; inset:0; border-radius:9999px; background:rgba(255,255,255,0.11); border:1px solid rgba(255,255,255,0.25); box-shadow:0 0 14px rgba(245,227,190,0.22); pointer-events:none;"></div>
-        <svg class="icon nav-icon" viewBox="0 0 24 24" style="font-size:20px; filter:drop-shadow(0 0 8px rgba(245,227,190,0.55));"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-        <span class="font-mono nav-label" style="font-size:9px; letter-spacing:0.1em; text-transform:uppercase; font-weight:700;">Haven</span>
-      </a>
+  <!-- Scripts -->
+  <script src="js/bridge.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/settings.js"></script>
 
-      <!-- Audio Tab -->
-      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-stone-400 cursor-pointer" id="navAudio" data-tab="audio" role="tab" tabindex="0" aria-selected="false" aria-controls="tabContentAudio" style="padding:6px 0; gap:3px; text-decoration:none;">
-        <div class="active-indicator hidden" style="position:absolute; inset:0; border-radius:9999px; background:rgba(255,255,255,0.11); border:1px solid rgba(255,255,255,0.25); box-shadow:0 0 14px rgba(245,227,190,0.22); pointer-events:none;"></div>
-        <svg class="icon nav-icon" viewBox="0 0 24 24" style="font-size:20px;"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-        <span class="font-mono nav-label" style="font-size:9px; letter-spacing:0.1em; text-transform:uppercase; font-weight:500;">Audio</span>
-      </a>
-
-      <!-- Circle Tab -->
-      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-stone-400 cursor-pointer" id="navCircle" data-tab="circle" role="tab" tabindex="0" aria-selected="false" aria-controls="tabContentCircle" style="padding:6px 0; gap:3px; text-decoration:none;">
-        <div class="active-indicator hidden" style="position:absolute; inset:0; border-radius:9999px; background:rgba(255,255,255,0.11); border:1px solid rgba(255,255,255,0.25); box-shadow:0 0 14px rgba(245,227,190,0.22); pointer-events:none;"></div>
-        <svg class="icon nav-icon" viewBox="0 0 24 24" style="font-size:20px;"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-        <span class="font-mono nav-label" style="font-size:9px; letter-spacing:0.1em; text-transform:uppercase; font-weight:500;">Circle</span>
-      </a>
-
-      <!-- Settings Tab -->
-      <a class="nav-tab relative flex-1 flex flex-col items-center justify-center text-stone-400 cursor-pointer" id="navSettings" data-tab="settings" role="tab" tabindex="0" aria-selected="false" aria-controls="tabContentSettings" style="padding:6px 0; gap:3px; text-decoration:none;">
-        <div class="active-indicator hidden" style="position:absolute; inset:0; border-radius:9999px; background:rgba(255,255,255,0.11); border:1px solid rgba(255,255,255,0.25); box-shadow:0 0 14px rgba(245,227,190,0.22); pointer-events:none;"></div>
-        <svg class="icon nav-icon" viewBox="0 0 24 24" style="font-size:20px;"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-        <span class="font-mono nav-label" style="font-size:9px; letter-spacing:0.1em; text-transform:uppercase; font-weight:500;">Settings</span>
-      </a>
-
-    </nav>
-  </div>
-
-  <!-- INTERACTION & BRIDGE SCRIPT -->
   <script>
-    (function() {
-      let isGuarding = true;
-      let drillTimer = null;
-      let targetDb = 34.3;
-      let currentDb = 34.3;
-      let lastTelemetryReceivedTime = 0;
-      let currentPin = "1234";
-      const reducedMotionQuery = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
-      const prefersReducedMotion = () => Boolean(reducedMotionQuery && reducedMotionQuery.matches);
-
-      const toggleRestBtn = document.getElementById('toggleRestBtn');
-      const toggleRestLabel = document.getElementById('toggleRestLabel');
-      const toggleRestIcon = document.getElementById('toggleRestIcon');
-      const statusDot = document.getElementById('statusDot');
-      const statusPulsePing = document.getElementById('statusPulsePing');
-      const statusBadgeText = document.getElementById('statusBadgeText');
-      const heroTitle = document.getElementById('heroTitle');
-      const heroSubtitle = document.getElementById('heroSubtitle');
-      const heroDb = document.getElementById('heroDb');
-      const serenityWave = document.getElementById('serenityWave');
-      const waveBars = serenityWave.querySelectorAll('.wave-bar');
-      const testSosBtn = document.getElementById('testSosBtn');
-      const testSosText = document.getElementById('testSosText');
-      const countdownBanner = document.getElementById('countdownBanner');
-      const cancelDrillBtn = document.getElementById('cancelDrillBtn');
-      const drillProgressFill = document.getElementById('drillProgressFill');
-      const drillBannerText = document.getElementById('drillBannerText');
-      const drillShieldIcon = document.getElementById('drillShieldIcon');
-      const vitalityAccordionBtn = document.getElementById('vitalityAccordionBtn');
-      const vitalityContent = document.getElementById('vitalityContent');
-      const accordionChevron = document.getElementById('accordionChevron');
-      const ghostSwitch = document.getElementById('ghostSwitch');
-      const meshSwitch = document.getElementById('meshSwitch');
-      const pinRow = document.getElementById('pinRow');
-      const pinDots = document.getElementById('pinDots');
-      const viewRefBtn = document.getElementById('viewReferenceBtn');
-      const closeRefBtn = document.getElementById('closeReferenceBtn');
-      const refModal = document.getElementById('referenceModal');
+    // Wire modal trigger buttons
+    document.addEventListener('DOMContentLoaded', () => {
       const pinModal = document.getElementById('pinModal');
-      const closePinModalBtn = document.getElementById('closePinModalBtn');
-      const savePinModalBtn = document.getElementById('savePinModalBtn');
-      const modalPinInput = document.getElementById('modalPinInput');
-      const fingerprintBtn = document.getElementById('fingerprintBtn');
+      const refModal = document.getElementById('refModal');
 
-      // Tabs
-      const navTabs = document.querySelectorAll('.nav-tab');
-      const tabHaven = document.getElementById('tabContentHaven');
-      const tabAudio = document.getElementById('tabContentAudio');
-      const tabCircle = document.getElementById('tabContentCircle');
-      const tabSettings = document.getElementById('tabContentSettings');
-
-      // Audio Tab elements
-      const recordSafeSampleBtn = document.getElementById('recordSafeSampleBtn');
-      const recordSafeSampleText = document.getElementById('recordSafeSampleText');
-      const audioSampleStatus = document.getElementById('audioSampleStatus');
-      const audioSampleCountPill = document.getElementById('audioSampleCountPill');
-      const audioCalibrationMsg = document.getElementById('audioCalibrationMsg');
-      const ownerVoiceActionBtn = document.getElementById('ownerVoiceActionBtn');
-      const ownerVoiceActionText = document.getElementById('ownerVoiceActionText');
-      const clearOwnerVoiceBtn = document.getElementById('clearOwnerVoiceBtn');
-      const ownerVoiceStatus = document.getElementById('ownerVoiceStatus');
-      const ownerVoiceStatusLabel = document.getElementById('ownerVoiceStatusLabel');
-      const ownerVoiceStatusMeta = document.getElementById('ownerVoiceStatusMeta');
-      const ownerVoiceStatePill = document.getElementById('ownerVoiceStatePill');
-
-      // Circle Tab elements
-      const circlePhoneInput = document.getElementById('circlePhoneInput');
-      const circleEndpointInput = document.getElementById('circleEndpointInput');
-      const saveCircleBtn = document.getElementById('saveCircleBtn');
-      const circleStatusMsg = document.getElementById('circleStatusMsg');
-
-      // Settings Tab elements
-      const btnReqOverlay = document.getElementById('btnReqOverlay');
-      const btnReqExactAlarm = document.getElementById('btnReqExactAlarm');
-      const btnReqBattery = document.getElementById('btnReqBattery');
-      const btnRotateKey = document.getElementById('btnRotateKey');
-      const keyVersionText = document.getElementById('keyVersionText');
-      const diagNativeAudio = document.getElementById('diagNativeAudio');
-      const diagMeshStatus = document.getElementById('diagMeshStatus');
-
-      let activeModal = null;
-      let lastFocusedElement = null;
-
-      function focusWithoutJump(element) {
-        if (!element || typeof element.focus !== 'function') return;
-        try {
-          element.focus({ preventScroll: true });
-        } catch (e) {
-          element.focus();
-        }
-      }
-
-      function openModal(modal, initialFocus) {
-        if (!modal) return;
-        lastFocusedElement = document.activeElement;
-        if (activeModal && activeModal !== modal) closeModal(activeModal, false);
-        activeModal = modal;
-        modal.classList.remove('hidden');
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('modal-open');
-        focusWithoutJump(initialFocus || modal.querySelector('button, input, [tabindex="0"]'));
-      }
-
-      function closeModal(modal, restoreFocus = true) {
-        if (!modal) return;
-        modal.classList.add('hidden');
-        modal.setAttribute('aria-hidden', 'true');
-        if (activeModal === modal) activeModal = null;
-        if (!activeModal) document.body.classList.remove('modal-open');
-        if (restoreFocus && lastFocusedElement && document.contains(lastFocusedElement)) {
-          focusWithoutJump(lastFocusedElement);
-          lastFocusedElement = null;
-        }
-      }
-
-      // 1. Toggle Haven Monitoring
-      toggleRestBtn.addEventListener('click', () => {
-        if (window.AndroidBridge && typeof window.AndroidBridge.toggleMonitoring === 'function') {
-          window.AndroidBridge.toggleMonitoring();
-        } else {
-          setGuardingState(!isGuarding);
-        }
+      document.getElementById('btnOpenPinModal')?.addEventListener('click', () => {
+        window.AGNav.openModal(pinModal);
+      });
+      document.getElementById('btnClosePinModal')?.addEventListener('click', () => {
+        window.AGNav.closeModal(pinModal);
       });
 
-      function setGuardingState(active) {
-        isGuarding = active;
-        if (isGuarding) {
-          toggleRestLabel.textContent = 'Pause Haven';
-          toggleRestIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
-          toggleRestIcon.style.color = '#f5e3be';
-          statusDot.style.background = '#34d399';
-          statusDot.style.boxShadow = '0 0 10px rgba(52,211,153,0.9)';
-          statusPulsePing.style.background = 'rgba(52,211,153,0.75)';
-          statusPulsePing.classList.remove('hidden');
-          statusBadgeText.textContent = 'ACTIVE • LOCAL NEURAL AI';
-          heroTitle.textContent = 'Silent Haven';
-          heroTitle.style.opacity = '1';
-          heroSubtitle.textContent = 'Neural network analyzing audio frames in isolated memory. Ephemeral zero-retention.';
-          heroDb.style.opacity = '1';
-        } else {
-          toggleRestLabel.textContent = 'Resume Haven';
-          toggleRestIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
-          toggleRestIcon.style.color = '#d8c7a3';
-          statusDot.style.background = '#64748b';
-          statusDot.style.boxShadow = 'none';
-          statusPulsePing.classList.add('hidden');
-          statusBadgeText.textContent = 'PAUSED';
-          heroTitle.textContent = 'Protection Idle';
-          heroTitle.style.opacity = '0.65';
-          heroSubtitle.textContent = 'Sensors in sleep mode. Tap resume to restore background protection.';
-          heroDb.textContent = '--';
-          heroDb.style.opacity = '0.4';
-          waveBars.forEach(b => {
-            b.style.height = '4px';
-            b.style.opacity = '0.25';
-          });
-        }
-      }
+      document.getElementById('btnOpenRefModal')?.addEventListener('click', () => {
+        window.AGNav.openModal(refModal);
+      });
+      document.getElementById('btnCloseRefModal')?.addEventListener('click', () => {
+        window.AGNav.closeModal(refModal);
+      });
 
-      // 2. Real-time Audio Telemetry hook from Kotlin
-      window.updateTelemetry = function(db, candidate, fastTrack) {
-        lastTelemetryReceivedTime = Date.now();
-        if (!isGuarding) return;
-        targetDb = Math.max(12, db + 100); // map negative dB to positive visual scale ~12-90 dB
-        if (candidate) {
-          heroTitle.textContent = 'Acoustic Anomaly Flagged';
-          heroTitle.style.color = '#f87171';
-          heroSubtitle.textContent = fastTrack ? 'Fast-track fusion active: high-frequency friction + respiratory coupling.' : 'Potential distress signature candidate detected.';
-          statusDot.style.background = '#f87171';
-          statusDot.style.boxShadow = '0 0 14px rgba(248,113,113,0.95)';
-        } else {
-          heroTitle.textContent = 'Silent Haven';
-          heroTitle.style.color = '#ffffff';
-          heroSubtitle.textContent = 'Neural network analyzing audio frames in isolated memory. Ephemeral zero-retention.';
-          statusDot.style.background = '#34d399';
-          statusDot.style.boxShadow = '0 0 10px rgba(52,211,153,0.9)';
-        }
-
-        // update soundwave heights directly
-        const normalized = Math.max(0, Math.min(1, (db + 60) / 60)); // 0.0 to 1.0
-        waveBars.forEach((bar, idx) => {
-          const factor = (idx === 4) ? 1.4 : (idx === 2 || idx === 7) ? 1.2 : 0.8;
-          const jitter = (Math.random() - 0.5) * 6;
-          const h = Math.max(6, Math.min(32, (normalized * 28 * factor) + jitter));
-          bar.style.height = h + 'px';
-          bar.style.opacity = '1';
+      // Sensitivity slider text update
+      const slider = document.getElementById('sensitivitySlider');
+      const valLabel = document.getElementById('sensitivityVal');
+      if (slider && valLabel) {
+        const labels = ['Minimum', 'Low', 'Balanced', 'High', 'Maximum'];
+        slider.addEventListener('input', () => {
+          valLabel.textContent = labels[parseInt(slider.value, 10) - 1] || 'Balanced';
         });
-      };
-
-      window.updatePipelineStage = function(stage) {
-        const messages = {
-          rapid_probe: 'Neural distress probe running on recent audio window.',
-          rapid_validated: 'Distress signature validated; opening alert protection.',
-          standard_inference: 'Full-context neural inference running.',
-          standard_validated: 'Distress signature validated; opening alert protection.'
-        };
-        if (messages[stage] && isGuarding) heroSubtitle.textContent = messages[stage];
-      };
-
-      // Natural breathing oscillation when idle
-      setInterval(() => {
-        if (!isGuarding) return;
-        if (prefersReducedMotion()) {
-          currentDb += (targetDb - currentDb) * 0.2;
-          heroDb.textContent = currentDb.toFixed(1);
-          return;
-        }
-        if (Date.now() - lastTelemetryReceivedTime > 2500) {
-          targetDb = 33.8 + Math.random() * 1.4;
-          const pattern = [8, 14, 22, 14, 28, 16, 10, 20, 8];
-          waveBars.forEach((bar, idx) => {
-            const jitter = (Math.random() - 0.5) * 4;
-            bar.style.height = Math.max(6, pattern[idx] + jitter) + 'px';
-          });
-        }
-        currentDb += (targetDb - currentDb) * 0.2;
-        heroDb.textContent = currentDb.toFixed(1);
-      }, 200);
-
-      // 3. Reassurance Drill (SOS Test & Cancellation)
-      testSosBtn.addEventListener('click', () => {
-        startDrillAnimation();
-      });
-
-      function startDrillAnimation() {
-        if (drillTimer) clearInterval(drillTimer);
-        let count = 3;
-        countdownBanner.classList.remove('hidden');
-        drillProgressFill.style.width = '0%';
-        drillBannerText.innerHTML = `Dispatching mock verification in <span class="font-mono text-gold font-bold" id="secondsCount">3</span>s`;
-        testSosBtn.style.opacity = '0.5';
-        testSosBtn.style.pointerEvents = 'none';
-        testSosText.textContent = '...';
-
-        setTimeout(() => { drillProgressFill.style.width = '100%'; }, 50);
-
-        drillTimer = setInterval(() => {
-          count--;
-          const sc = document.getElementById('secondsCount');
-          if (sc) sc.textContent = count;
-
-          if (count <= 0) {
-            clearInterval(drillTimer);
-            drillTimer = null;
-            drillBannerText.innerHTML = `<span class="text-emerald flex items-center" style="gap:4px; font-weight:700;"><svg class="icon text-emerald" viewBox="0 0 24 24" style="font-size:15px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>✓ Guardian Dispatch Verified</span>`;
-            drillShieldIcon.innerHTML = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>';
-            drillShieldIcon.style.color = '#34d399';
-            testSosText.textContent = 'Passed';
-
-            setTimeout(() => {
-              countdownBanner.classList.add('hidden');
-              testSosBtn.style.opacity = '1';
-              testSosBtn.style.pointerEvents = 'auto';
-              testSosText.textContent = 'Test';
-              drillShieldIcon.innerHTML = '<path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>';
-              drillShieldIcon.style.color = 'var(--gold)';
-            }, 2600);
-          }
-        }, 1000);
       }
 
-      cancelDrillBtn.addEventListener('click', () => {
-        if (drillTimer) {
-          clearInterval(drillTimer);
-          drillTimer = null;
-        }
-        if (window.AndroidBridge && typeof window.AndroidBridge.cancelSosAlert === 'function') {
-          window.AndroidBridge.cancelSosAlert();
-        }
-        drillBannerText.innerHTML = `<span style="color:#d8c7a3; font-weight:600;">✓ Drill Cancelled · Protection Active</span>`;
-        drillProgressFill.style.width = '0%';
-        setTimeout(() => {
-          countdownBanner.classList.add('hidden');
-          testSosBtn.style.opacity = '1';
-          testSosBtn.style.pointerEvents = 'auto';
-          testSosText.textContent = 'Test';
-        }, 1200);
-      });
-
-      // 4. Ghost Mode Switch
-      ghostSwitch.addEventListener('click', () => {
-        const next = !ghostSwitch.classList.contains('active');
-        ghostSwitch.classList.toggle('active', next);
-        ghostSwitch.setAttribute('aria-checked', next ? 'true' : 'false');
-        if (window.AndroidBridge && typeof window.AndroidBridge.setQuietAlertMode === 'function') {
-          window.AndroidBridge.setQuietAlertMode(next);
-        }
-      });
-
-      // 5. Peer Relay Mesh Switch
-      meshSwitch.addEventListener('click', () => {
-        const next = !meshSwitch.classList.contains('active');
-        meshSwitch.classList.toggle('active', next);
-        meshSwitch.setAttribute('aria-checked', next ? 'true' : 'false');
-        diagMeshStatus.textContent = next ? 'Mesh Active (Advertising & Scanning)' : 'Mesh Standby';
-        if (window.AndroidBridge && typeof window.AndroidBridge.setCommunityMeshEnabled === 'function') {
-          window.AndroidBridge.setCommunityMeshEnabled(next);
-        }
-      });
-
-      // 6. Accordion Diagnostics
-      vitalityAccordionBtn.addEventListener('click', () => {
-        const isClosed = vitalityContent.classList.contains('hidden');
-        if (isClosed) {
-          vitalityContent.classList.remove('hidden');
-          accordionChevron.style.transform = 'rotate(180deg)';
-          vitalityAccordionBtn.setAttribute('aria-expanded', 'true');
-        } else {
-          vitalityContent.classList.add('hidden');
-          accordionChevron.style.transform = 'rotate(0deg)';
-          vitalityAccordionBtn.setAttribute('aria-expanded', 'false');
-        }
-      });
-
-      // 7. PIN Row & Modal
-      function openPinModal() {
-        modalPinInput.value = currentPin;
-        openModal(pinModal, modalPinInput);
-      }
-      pinRow.addEventListener('click', openPinModal);
-      pinRow.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openPinModal();
-        }
-      });
-      closePinModalBtn.addEventListener('click', () => closeModal(pinModal));
-      pinModal.addEventListener('click', (e) => {
-        if (e.target === pinModal) closeModal(pinModal);
-      });
-      savePinModalBtn.addEventListener('click', () => {
-        const val = modalPinInput.value.trim();
-        if (val.length >= 4 && val.length <= 8) {
-          currentPin = val;
-          pinDots.textContent = '•'.repeat(val.length);
-          closeModal(pinModal);
-          if (window.AndroidBridge && typeof window.AndroidBridge.saveQuickPin === 'function') {
-            window.AndroidBridge.saveQuickPin(val);
-          }
-        }
-      });
-
-      document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && activeModal) {
-          closeModal(activeModal);
-          return;
-        }
-        if (event.key === 'Tab' && activeModal) {
-          const focusable = Array.from(activeModal.querySelectorAll('button:not([disabled]), input, [href], [tabindex]:not([tabindex="-1"])'));
-          if (!focusable.length) return;
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            focusWithoutJump(last);
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            focusWithoutJump(first);
-          }
-        }
-      });
-
-      // 8. Bottom Navigation
-      navTabs.forEach(tab => {
-        tab.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            tab.click();
-          }
-        });
-        tab.addEventListener('click', (e) => {
-          e.preventDefault();
-          const target = tab.getAttribute('data-tab');
-          
-          navTabs.forEach(t => {
-            t.classList.remove('text-gold');
-            t.classList.add('text-stone-400');
-            const ind = t.querySelector('.active-indicator');
-            if (ind) ind.classList.add('hidden');
-            const icon = t.querySelector('.nav-icon');
-            if (icon) icon.style.filter = 'none';
-             const lbl = t.querySelector('.nav-label');
-             if (lbl) lbl.style.fontWeight = '500';
-             t.setAttribute('aria-selected', 'false');
-           });
-
-          tab.classList.remove('text-stone-400');
-          tab.classList.add('text-gold');
-          const activeInd = tab.querySelector('.active-indicator');
-          if (activeInd) activeInd.classList.remove('hidden');
-          const activeIcon = tab.querySelector('.nav-icon');
-          if (activeIcon) activeIcon.style.filter = 'drop-shadow(0 0 8px rgba(245,227,190,0.55))';
-           const activeLbl = tab.querySelector('.nav-label');
-           if (activeLbl) activeLbl.style.fontWeight = '700';
-           tab.setAttribute('aria-selected', 'true');
-
-           // Switch views
-           const panels = [tabHaven, tabAudio, tabCircle, tabSettings];
-           panels.forEach(panel => {
-             panel.classList.add('hidden');
-             panel.setAttribute('aria-hidden', 'true');
-           });
-
-           const targetPanel = target === 'haven' ? tabHaven
-             : target === 'audio' ? tabAudio
-             : target === 'circle' ? tabCircle
-             : target === 'settings' ? tabSettings
-             : tabHaven;
-           targetPanel.classList.remove('hidden');
-            targetPanel.setAttribute('aria-hidden', 'false');
-
-           window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
-         });
-       });
-
-      // 9. Safe Sample Recording
-      recordSafeSampleBtn.addEventListener('click', () => {
-        if (window.AndroidBridge && typeof window.AndroidBridge.recordSafeSample === 'function') {
-          window.AndroidBridge.recordSafeSample();
-          audioCalibrationMsg.textContent = 'Recording 3-second sample... Speak normally.';
-          recordSafeSampleBtn.style.opacity = '0.5';
-          recordSafeSampleBtn.style.pointerEvents = 'none';
-        }
-      });
-
-      window.updateCalibration = function(count, remaining) {
-        audioSampleStatus.textContent = `${count} of 3 samples recorded`;
-        audioSampleCountPill.textContent = `${count}/3`;
-        recordSafeSampleBtn.style.opacity = '1';
-        recordSafeSampleBtn.style.pointerEvents = 'auto';
-        if (remaining > 0) {
-          audioCalibrationMsg.textContent = `Recording sample in progress (${remaining} frames remaining). Keep audio safe.`;
-        } else {
-          audioCalibrationMsg.textContent = `Safe profile samples saved: ${count}/3. Audio statistics stored locally.`;
-        }
-      };
-
-      // 10. Optional owner voice profile
-      let ownerVoiceProfileState = null;
-
-      function normalizeOwnerVoiceState(state) {
-        if (typeof state === 'boolean') return { enrolled: state };
-        if (typeof state === 'string') {
-          try {
-            const parsed = JSON.parse(state);
-            return parsed && typeof parsed === 'object' ? parsed : { status: state };
-          } catch (e) {
-            return { status: state };
-          }
-        }
-        return state && typeof state === 'object' ? state : {};
-      }
-
-      function renderOwnerVoiceProfile(state) {
-        const profile = normalizeOwnerVoiceState(state);
-        const status = String(profile.status || '').toLowerCase();
-        const enrolling = profile.enrolling === true || profile.isEnrolling === true || profile.inProgress === true || ['enrolling', 'recording', 'pending', 'processing'].includes(status);
-        const enrolled = !enrolling && (profile.enrolled === true || profile.isEnrolled === true || profile.hasProfile === true || profile.active === true || ['enrolled', 'active', 'ready'].includes(status));
-         const modelUnavailable = profile.modelAvailable === false;
-         const hasError = status === 'error' || status === 'failed' || Boolean(profile.error) || modelUnavailable;
-        const rawSamples = profile.sampleCount ?? profile.samplesRecorded ?? profile.samples;
-        const sampleCount = Number.isFinite(Number(rawSamples)) ? Number(rawSamples) : null;
-
-        ownerVoiceActionBtn.disabled = enrolling;
-        clearOwnerVoiceBtn.classList.toggle('hidden', !enrolled || enrolling);
-
-        if (enrolling) {
-          ownerVoiceStatePill.textContent = 'Recording';
-          ownerVoiceStatusLabel.textContent = 'Enrollment in progress';
-          ownerVoiceStatusMeta.textContent = 'Complete the short sample on this device';
-          ownerVoiceActionText.textContent = 'Enrollment in progress…';
-          ownerVoiceStatus.style.color = 'var(--gold-dim)';
-          ownerVoiceStatus.textContent = 'Listening locally for your owner voice sample.';
-        } else if (enrolled) {
-          ownerVoiceStatePill.textContent = 'Ready';
-          ownerVoiceStatusLabel.textContent = 'Owner voice profile ready';
-          ownerVoiceStatusMeta.textContent = sampleCount === null ? 'Signature stored locally on this device' : `${sampleCount} local sample${sampleCount === 1 ? '' : 's'} recorded`;
-          ownerVoiceActionText.textContent = 'Update Owner Voice Profile';
-          ownerVoiceStatus.style.color = 'var(--emerald)';
-          ownerVoiceStatus.textContent = 'Voice features remain on this device.';
-        } else {
-          ownerVoiceStatePill.textContent = hasError ? 'Needs attention' : 'Not set';
-          ownerVoiceStatusLabel.textContent = hasError ? 'Owner voice profile unavailable' : 'No profile enrolled';
-           ownerVoiceStatusMeta.textContent = modelUnavailable ? 'Optional embedding model is not provisioned' : (hasError ? 'Try enrollment again when ready' : 'Ready for an on-device enrollment');
-          ownerVoiceActionText.textContent = 'Start Owner Voice Enrollment';
-          ownerVoiceStatus.style.color = hasError ? 'var(--ruby)' : 'var(--text-tertiary)';
-           ownerVoiceStatus.textContent = modelUnavailable ? 'Owner voice matching is disabled until an approved on-device embedding model is installed.' : (hasError ? String(profile.error || 'The voice profile could not be loaded.') : 'Voice features remain on this device.');
-        }
-      };
-
-      window.updateOwnerVoiceProfile = function(state) {
-        ownerVoiceProfileState = normalizeOwnerVoiceState(state);
-        renderOwnerVoiceProfile(ownerVoiceProfileState);
-      };
-
-      ownerVoiceActionBtn.addEventListener('click', () => {
-        if (window.AndroidBridge && typeof window.AndroidBridge.startOwnerVoiceEnrollment === 'function') {
-          window.AndroidBridge.startOwnerVoiceEnrollment();
-          ownerVoiceProfileState = Object.assign({}, ownerVoiceProfileState || {}, { enrolling: true, status: 'enrolling' });
-          renderOwnerVoiceProfile(ownerVoiceProfileState);
-        } else {
-          ownerVoiceStatus.style.color = 'var(--text-secondary)';
-          ownerVoiceStatus.textContent = 'Owner voice enrollment is unavailable on this device.';
-        }
-      });
-
-      clearOwnerVoiceBtn.addEventListener('click', () => {
-        if (window.AndroidBridge && typeof window.AndroidBridge.clearOwnerVoiceProfile === 'function') {
-          window.AndroidBridge.clearOwnerVoiceProfile();
-          ownerVoiceProfileState = { enrolled: false, status: 'cleared' };
-          renderOwnerVoiceProfile(ownerVoiceProfileState);
-          ownerVoiceStatus.textContent = 'Owner voice profile cleared from this device.';
-        } else {
-          ownerVoiceStatus.style.color = 'var(--text-secondary)';
-          ownerVoiceStatus.textContent = 'Clearing the owner voice profile is unavailable on this device.';
-        }
-      });
-
-      renderOwnerVoiceProfile(null);
-
-      // 11. Circle Settings (Phone & HTTPS)
-      saveCircleBtn.addEventListener('click', () => {
-        const phone = circlePhoneInput.value.trim();
-        const endpoint = circleEndpointInput.value.trim();
-        if (window.AndroidBridge && typeof window.AndroidBridge.saveCircleSettings === 'function') {
-          window.AndroidBridge.saveCircleSettings(phone, endpoint);
-          circleStatusMsg.textContent = 'Contacts and endpoint saved locally.';
-          setTimeout(() => { circleStatusMsg.textContent = ''; }, 3000);
-        }
-      });
-
-      // 12. Settings Tab actions
-      btnReqOverlay.addEventListener('click', () => {
-        if (window.AndroidBridge && typeof window.AndroidBridge.requestOverlay === 'function') {
-          window.AndroidBridge.requestOverlay();
-        }
-      });
-      btnReqExactAlarm.addEventListener('click', () => {
-        if (window.AndroidBridge && typeof window.AndroidBridge.requestExactAlarm === 'function') {
-          window.AndroidBridge.requestExactAlarm();
-        }
-      });
-      btnReqBattery.addEventListener('click', () => {
-        if (window.AndroidBridge && typeof window.AndroidBridge.requestBatteryExemption === 'function') {
-          window.AndroidBridge.requestBatteryExemption();
-        }
-      });
-      btnRotateKey.addEventListener('click', () => {
-        if (window.AndroidBridge && typeof window.AndroidBridge.rotateKey === 'function') {
-          const v = window.AndroidBridge.rotateKey();
-          keyVersionText.textContent = `Key Version ${v} (StrongBox / Keystore)`;
-        }
-      });
-
-      // 13. Modals
-      viewRefBtn.addEventListener('click', () => openModal(refModal, closeRefBtn));
-      closeRefBtn.addEventListener('click', () => closeModal(refModal));
-      fingerprintBtn.addEventListener('click', openPinModal);
-      fingerprintBtn.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openPinModal();
-        }
-      });
-      refModal.addEventListener('click', (e) => {
-        if (e.target === refModal) closeModal(refModal);
-      });
-
-      // 14. State Synchronization from Android
-      window.initFromNative = function(state) {
-        if (!state) return;
-        if (typeof state.isMonitoring === 'boolean') setGuardingState(state.isMonitoring);
-        if (typeof state.quietAlertMode === 'boolean') {
-          ghostSwitch.classList.toggle('active', state.quietAlertMode);
-          ghostSwitch.setAttribute('aria-checked', state.quietAlertMode ? 'true' : 'false');
-        }
-        if (typeof state.communityMeshEnabled === 'boolean') {
-          meshSwitch.classList.toggle('active', state.communityMeshEnabled);
-          meshSwitch.setAttribute('aria-checked', state.communityMeshEnabled ? 'true' : 'false');
-          diagMeshStatus.textContent = state.communityMeshEnabled ? 'Mesh Active (Advertising & Scanning)' : 'Mesh Standby';
-        }
-        if (state.quickPin) {
-          currentPin = state.quickPin;
-          pinDots.textContent = '•'.repeat(state.quickPin.length);
-        }
-        if (state.phoneNumber) circlePhoneInput.value = state.phoneNumber;
-        if (state.httpsEndpoint) circleEndpointInput.value = state.httpsEndpoint;
-        if (typeof state.safeSamplesCount === 'number') {
-          window.updateCalibration(state.safeSamplesCount, 0);
-        }
-        if (state.ownerVoiceProfile !== undefined) {
-          window.updateOwnerVoiceProfile(state.ownerVoiceProfile);
-        }
-        if (state.keyVersion) {
-          keyVersionText.textContent = `Key Version ${state.keyVersion} (StrongBox / Keystore)`;
-        }
-        if (state.nativeAudioStatus) {
-          diagNativeAudio.textContent = state.nativeAudioStatus;
-        }
-        if (state.hasOverlay) btnReqOverlay.textContent = 'Granted';
-        if (state.hasExactAlarm) btnReqExactAlarm.textContent = 'Granted';
-        if (state.isIgnoringBattery) btnReqBattery.textContent = 'Granted';
-      };
-
-      // Query native initial state on startup
+      // Initial state fetch from native bridge
       setTimeout(() => {
-        if (window.AndroidBridge && typeof window.AndroidBridge.getInitialState === 'function') {
-          try {
-            const raw = window.AndroidBridge.getInitialState();
-            const parsed = JSON.parse(raw);
-            window.initFromNative(parsed);
-          } catch(e) {
-            console.error("Init state error:", e);
-          }
+        const state = window.AGBridge.getInitialState();
+        if (state && window.initFromNative) {
+          window.initFromNative(state);
         }
       }, 100);
-
-    })();
+    });
   </script>
 </body>
 </html>

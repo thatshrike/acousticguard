@@ -100,7 +100,18 @@ class TfliteVoiceEmbeddingModel(
         inputZeroPoint = localInputZeroPoint
         outputScale = localOutputScale
         outputZeroPoint = localOutputZeroPoint
+        inputBuffer = if (localInterpreter != null && localInputElements > 0 && localInputType != null) {
+            ByteBuffer.allocateDirect(localInputElements * bytesPerElement(localInputType))
+                .order(ByteOrder.nativeOrder())
+        } else null
+        outputBuffer = if (localInterpreter != null && localOutputElements > 0 && localOutputType != null) {
+            ByteBuffer.allocateDirect(localOutputElements * bytesPerElement(localOutputType))
+                .order(ByteOrder.nativeOrder())
+        } else null
     }
+
+    private val inputBuffer: ByteBuffer?
+    private val outputBuffer: ByteBuffer?
 
     @Synchronized
     override fun embed(pcm16: ShortArray, sampleRate: Int): FloatArray? {
@@ -108,23 +119,23 @@ class TfliteVoiceEmbeddingModel(
         val activeInterpreter = interpreter ?: return null
         val activeInputType = inputType ?: return null
         val activeOutputType = outputType ?: return null
+        val inBuf = inputBuffer ?: return null
+        val outBuf = outputBuffer ?: return null
         if (sampleRate <= 0 || pcm16.isEmpty() || inputElements <= 0 || outputElements <= 0) return null
         return try {
-            val input = ByteBuffer.allocateDirect(inputElements * bytesPerElement(activeInputType))
-                .order(ByteOrder.nativeOrder())
+            inBuf.clear()
             val copied = minOf(inputElements, pcm16.size)
             val start = pcm16.size - copied
             repeat(inputElements) { index ->
                 val sourceIndex = index - (inputElements - copied)
                 val value = if (sourceIndex >= 0) pcm16[start + sourceIndex] / 32768f else 0f
-                writeInput(input, value, activeInputType)
+                writeInput(inBuf, value, activeInputType)
             }
-            input.rewind()
-            val output = ByteBuffer.allocateDirect(outputElements * bytesPerElement(activeOutputType))
-                .order(ByteOrder.nativeOrder())
-            activeInterpreter.run(input, output)
-            output.rewind()
-            FloatArray(outputElements) { readOutput(output, activeOutputType) }.also { embedding ->
+            inBuf.rewind()
+            outBuf.clear()
+            activeInterpreter.run(inBuf, outBuf)
+            outBuf.rewind()
+            FloatArray(outputElements) { readOutput(outBuf, activeOutputType) }.also { embedding ->
                 if (embedding.any { !it.isFinite() }) return null
             }
         } catch (_: Exception) {
